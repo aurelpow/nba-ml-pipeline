@@ -1,17 +1,47 @@
 """
 This module contains the common variables used in the NBA Stats Data Pipeline.
 """
-# Define the sheet names
-boxscore_sheet_name = "boxscores" 
-nba_teams_sheet_name = "team_data"
-nba_players_sheet_name = "player_data"
 import os 
-import json
-# Path to the credentials file
-CREDENTIALS_FILE_PATH = "common/credentials.json"
+import pandas as pd
 
-# Ensure the credentials file exists
-if not os.path.exists(CREDENTIALS_FILE_PATH):
-    raise FileNotFoundError(f"The credentials file was not found at {CREDENTIALS_FILE_PATH}. Please ensure it exists.")
 
-CREDENTIALS_FILE = CREDENTIALS_FILE_PATH
+# Define the names of the files to be used in the databases folder.
+AdvancedBoxscoreFileName = "nba_boxscore_advanced" 
+BoxscoreFileName = "nba_boxscore_basic"
+PlayersFileName = "nba_players"
+TeamsFileName = "nba_teams"
+
+# Define the path to the databases folder.
+databases_path = "databases/"
+
+def save_database_local(df_to_save: pd.DataFrame, df_to_save_name: str) -> None:
+    """
+    Save the DataFrame to an Excel file in the 'databases' folder.
+    
+    Args:
+        df_to_save (pd.DataFrame): The DataFrame to save.
+        df_to_save_name (str): The base name for the saved file.
+    """
+    # Append .xlsx extension if not already present.
+    if not df_to_save_name.lower().endswith('.csv'):
+        df_to_save_name = f"{df_to_save_name}.csv"
+    file_path = f"databases/{df_to_save_name}"
+    df_to_save.to_csv(file_path, index=False)
+    print(f"Saved to database: {file_path}")
+
+
+def load_existing_boxscores(FileName: str) -> pd.DataFrame:
+    """
+    Load already fetched df if available.
+    
+    Returns:
+        pd.DataFrame: The existing DataFrame or an empty one.
+    """
+    file_path = f"{databases_path}{FileName}.csv"
+    if os.path.exists(file_path):
+        try:
+            df_existing = pd.read_csv(file_path)
+            return df_existing
+        except Exception as e:
+            print(f"Error loading existing boxscore file: {e}")
+    return pd.DataFrame()

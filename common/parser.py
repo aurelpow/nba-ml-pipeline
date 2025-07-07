@@ -11,15 +11,20 @@ def build_parser(parser:argparse.ArgumentParser):
             str: The season type to run the process for
     """
     # Add arguments to the parser
-    parser.add_argument("process_name", type=str, help="Name of the process to run")
-    parser.add_argument("current_season", type=str, help="Current season to run the process for")
-    parser.add_argument("season_type", type=str, help="Type of season to run the process for")
+    parser.add_argument("-p", "--process", type=str, required=True, help="Name of the process to run")
+    parser.add_argument("-s", "--season", type=str, required=True, help="Current season to run the process for")
+    parser.add_argument("-st","--season_type", type=str, default=None, help="Type of season to run the process for")
+    parser.add_argument("-d","--date", type=str, default=None, help="Date to run the process for (optional)")
+    parser.add_argument("-dn","--days_number", type=int, default=None, help="Number of days to run the process for (optional)")
+
     
     # Get the arguments from the parser
     args = parser.parse_args()
 
-    process_name = args.process_name
-    current_season = args.current_season
+    process_name = args.process
+    current_season = args.season
     season_type = args.season_type
+    date = args.date
+    days_number = args.days_number
     
-    return process_name, current_season, season_type
+    return process_name, current_season, season_type, date, days_number

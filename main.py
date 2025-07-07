@@ -5,11 +5,10 @@ import logging
 import sys
 
 from src.get_nba_boxscore_basic import BoxscoreGames
-from src.get_nba_players import NbaPlayersData as NbaPlayersData_1
-from src.get_nba_players_endpoints import NbaPlayersData
+from src.get_nba_players import NbaPlayersData
 from src.get_nba_teams import NbaTeamsData
-
-from common.confidentials import sheet_url
+from src.get_future_games import NbaGamesLog
+from src.get_nba_advanced_boxscore import AdvancedBoxscoreGames
 from common.parser import build_parser
 
 
@@ -18,9 +17,14 @@ def main():
 
     parser:argparse.ArgumentParser = argparse.ArgumentParser(description="NBA Stats Data Pipeline")
 
-    process_name, current_season, season_type = build_parser(parser)
+    process_name, current_season, season_type, date, days_number = build_parser(parser)
 
-    valid_processes: list[str] = ["get_nba_players","get_nba_players_endpoints", "get_nba_teams", "get_nba_boxscore_basic"]
+    valid_processes: list[str] = ["get_nba_players",
+                                  "get_nba_players_endpoints", 
+                                  "get_nba_teams", 
+                                  "get_nba_boxscore_basic", 
+                                  "get_future_games", 
+                                  "get_nba_advanced_boxscore"]
     
     # Debugging: Print received process_name and valid processes
     print(f"Received process_name: {process_name}")
@@ -35,24 +39,28 @@ def main():
         raise Exception(f"Invalid process name: {process_name}. Valid processes are: {valid_processes}")
 
     # Execute the process
-    if process_name == "get_nba_players":
+    elif process_name == "get_nba_players":
         print(f"Running process: {process_name} with season: {current_season}")
-        NbaPlayersData_1(current_season).run()
-
-    # Execute the process
-    if process_name == "get_nba_players_endpoints":
-        print(f"Running process: {process_name} with season: {current_season}")
-        NbaPlayersData().run()
+        NbaPlayersData(current_season=current_season).run()
 
     elif process_name == "get_nba_teams":
         print(f"Running process: {process_name} with season: {current_season}")
-        NbaTeamsData(current_season).run()
+        NbaTeamsData().run()
     
     elif process_name == "get_nba_boxscore_basic":
         print(f"Running process: {process_name} with season: {current_season}")
-        BoxscoreGames(current_season, season_type).run()
+        BoxscoreGames(current_season).run()
 
-    logging.info(f"Process {process_name} completed in {datetime.today() - time_start}.")
+    elif process_name == "get_future_games":
+        print(f"Running process: {process_name} with season: {current_season}")
+        NbaGamesLog(date,days_number).run()
+    
+    elif process_name == "get_nba_advanced_boxscore":
+        print(f"Running process: {process_name} with season: {current_season}")
+        AdvancedBoxscoreGames(current_season).run()
+
+    # print the time taken to run the process    
+    print(f"Process {process_name} completed in {datetime.today() - time_start}.")
     
 
 if __name__ == "__main__":
