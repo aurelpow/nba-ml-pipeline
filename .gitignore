@@ -3,6 +3,15 @@ common/confidentials.py
 common/credentials.json
 credentials_encrypted.json
 
+# Testing notebook
+#  - This notebook is used to test the code and the models
+#  - It is not meant to be committed to the repository
+ml_dev/notebooks/testingNotebook.ipynb
+
+# img and models folder from ml_dev 
+ml_dev/img/
+ml_dev/models/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -177,7 +186,7 @@ cython_debug/
 #  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
 #  and can be added to the global gitignore or merged into this file.  For a more nuclear
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
-#.idea/
+.idea/
 
 # Ruff stuff:
 .ruff_cache/
