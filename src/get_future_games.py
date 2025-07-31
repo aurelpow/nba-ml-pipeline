@@ -4,6 +4,8 @@ import pandas as pd
 from nba_api.stats.endpoints import scoreboardv2
 from nba_api.stats.library.parameters import SeasonNullable
 
+from nba_api.stats.endpoints import leaguegamefinder
+from nba_api.stats.library.parameters import LeagueID
 from common.singleton_meta import SingletonMeta
 from common.utils import  save_database_local
 
@@ -29,7 +31,6 @@ class NbaGamesLog(metaclass=SingletonMeta):
         start_year = int(SeasonNullable.current_season.split("-")[0])
         # Define start_date as October 1st of that year
         start_date = datetime.date(start_year, 10, 1)
-
         return start_date
 
     def get_ended_games_from_api(self) -> pd.DataFrame:

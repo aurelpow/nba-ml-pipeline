@@ -5,7 +5,7 @@ import requests
 from nba_api.stats.endpoints import boxscoreadvancedv3
 from nba_api.stats.library.parameters import LeagueID
 from common.utils import  (save_database_local, load_existing_boxscores,
-                            AdvancedBoxscoreFileName, databases_path) 
+                            AdvancedBoxscoreFileName) 
 from common.singleton_meta import SingletonMeta
 
 

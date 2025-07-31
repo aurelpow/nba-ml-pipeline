@@ -8,8 +8,10 @@ import pandas as pd
 # Define the names of the files to be used in the databases folder.
 AdvancedBoxscoreFileName = "nba_boxscore_advanced" 
 BoxscoreFileName = "nba_boxscore_basic"
-PlayersFileName = "nba_players"
-TeamsFileName = "nba_teams"
+PlayersFileName = "nba_players_df"
+TeamsFileName = "nba_teams_df"
+FutureGamesFileName = "nba_future_games_df"
+PredictionsFileName = 'nba_points_predictions_df'
 
 # Define the path to the databases folder.
 databases_path = "databases/"
