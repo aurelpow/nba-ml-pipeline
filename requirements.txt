@@ -1,5 +1,5 @@
-requests
-gspread
-oauth2client
-pandas
-nba_api
+pandas>=1.3
+numpy>=1.19
+lightgbm>=3.3
+joblib>=1.1
+pyarrow>=5.0 
