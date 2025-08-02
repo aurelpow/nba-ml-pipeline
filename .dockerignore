@@ -1,0 +1,8 @@
+# .dockerignore
+.ipynb_checkpoints/
+__pycache__/
+*.py[cod]
+.venv/
+.vscode/
+.git/
+databases/
