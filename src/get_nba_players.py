@@ -5,6 +5,13 @@ from nba_api.stats.endpoints import playerindex
 from nba_api.stats.endpoints import commonplayerinfo
 from common.singleton_meta import SingletonMeta
 from common.utils import  save_database_local
+import nba_api.stats.library.http as http_lib
+import nba_api.stats.library.http as http
+http_lib._NBAStatsHTTP__timeout = 60
+# Make the NBA-API pretend to be a browser
+http.NBAStatsHTTP.headers.update({
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+})
 
 class NbaPlayersData(metaclass=SingletonMeta):
     """

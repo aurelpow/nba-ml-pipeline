@@ -21,7 +21,6 @@ def main():
     process_name, current_season, season_type, date, days_number, model_path = build_parser(parser)
 
     valid_processes: list[str] = ["get_nba_players",
-                                  "get_nba_players_endpoints", 
                                   "get_nba_teams", 
                                   "get_nba_boxscore_basic", 
                                   "get_future_games", 
