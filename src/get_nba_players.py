@@ -1,10 +1,10 @@
 import pandas as pd 
-import time 
+
+from common.singleton_meta import SingletonMeta
+from common.utils import  PlayersFileName, save_database
+
 
 from nba_api.stats.endpoints import playerindex
-from nba_api.stats.endpoints import commonplayerinfo
-from common.singleton_meta import SingletonMeta
-from common.utils import  save_database_local
 import nba_api.stats.library.http as http_lib
 import nba_api.stats.library.http as http
 http_lib._NBAStatsHTTP__timeout = 60
@@ -18,14 +18,16 @@ class NbaPlayersData(metaclass=SingletonMeta):
     A class to fetch and update NBA players data.
     """
 
-    def __init__(self, current_season: str) -> None:
+    def __init__(self, current_season: str, save_mode: str) -> None:
         """
         Initialize the NBA players data object.
             Args:
                 current_season (str): The current season in the format "YYYY-YY".
+                save_mode (str): The mode to save the data, either "bq" for BigQuery or "local" for local storage.
         """
         self.current_season: str = current_season
-        self.file_name: str = f"nba_players_df_{current_season}"
+        self.file_name: str = f"{PlayersFileName}_{current_season}"
+        self.SAVE_MODE: str = save_mode
 
     def get_nba_players_index(self) -> pd.DataFrame:
         """
@@ -47,4 +49,5 @@ class NbaPlayersData(metaclass=SingletonMeta):
         players_df: pd.DataFrame = self.get_nba_players_index()
         
         # Save the df as .csv file in the databases folder
-        save_database_local(players_df, self.file_name)
+        save_database(players_df, self.file_name, mode = self.SAVE_MODE)
+        print(f"✅ Players data saved with mode: {self.SAVE_MODE}")

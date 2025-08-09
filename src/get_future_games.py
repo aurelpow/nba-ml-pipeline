@@ -7,7 +7,7 @@ from nba_api.stats.library.parameters import SeasonNullable
 from nba_api.stats.endpoints import leaguegamefinder
 from nba_api.stats.library.parameters import LeagueID
 from common.singleton_meta import SingletonMeta
-from common.utils import  save_database_local
+from common.utils import FutureGamesFileName, save_database
 
 
 class NbaGamesLog(metaclass=SingletonMeta):
@@ -15,7 +15,7 @@ class NbaGamesLog(metaclass=SingletonMeta):
     A class to fetch and update NBA future games data.
     """
 
-    def __init__(self, date: datetime.date, days_number: int) -> None:
+    def __init__(self, save_mode: int, date: datetime.date,  days_number: int) -> None:
         """
         Initialize the NBA future games data object.
             Args:
@@ -24,6 +24,7 @@ class NbaGamesLog(metaclass=SingletonMeta):
         """
         self.date: datetime.date = datetime.datetime.strptime(date, "%Y-%m-%d").date()
         self.days_number: int = days_number
+        self.SAVE_MODE: int = save_mode
 
     def get_start_date(self) -> datetime.date:
         # Define the start and end dates for the range 
@@ -121,8 +122,8 @@ class NbaGamesLog(metaclass=SingletonMeta):
         
         # Fetch the games from the API
         games_df = self.get_games_from_api(end_date)
-        #print(games_df)
+
         # Save the DataFrame locally (optional)
-        save_database_local(games_df, "nba_future_games_df")
-        
-        return games_df
+        save_database(games_df, FutureGamesFileName, mode=self.SAVE_MODE)
+        print(f"✅ Future Games data saved with mode: {self.SAVE_MODE}")
+    

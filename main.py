@@ -18,7 +18,7 @@ def main():
 
     parser:argparse.ArgumentParser = argparse.ArgumentParser(description="NBA Stats Data Pipeline")
 
-    process_name, current_season, season_type, date, days_number, model_path = build_parser(parser)
+    process_name, current_season,save_mode,season_type, date, days_number, model_path = build_parser(parser)
 
     valid_processes: list[str] = ["get_nba_players",
                                   "get_nba_teams", 
@@ -42,11 +42,11 @@ def main():
     # Execute the process
     elif process_name == "get_nba_players":
         print(f"Running process: {process_name} with season: {current_season}")
-        NbaPlayersData(current_season=current_season).run()
+        NbaPlayersData(current_season=current_season, save_mode=save_mode ).run()
 
     elif process_name == "get_nba_teams":
         print(f"Running process: {process_name} with season: {current_season}")
-        NbaTeamsData().run()
+        NbaTeamsData(save_mode=save_mode).run()
     
     elif process_name == "get_nba_boxscore_basic":
         print(f"Running process: {process_name} with season: {current_season}")
@@ -54,7 +54,7 @@ def main():
 
     elif process_name == "get_future_games":
         print(f"Running process: {process_name} with season: {current_season}")
-        NbaGamesLog(date,days_number).run()
+        NbaGamesLog(save_mode=save_mode,date=date,days_number=days_number).run()
     
     elif process_name == "get_nba_advanced_boxscore":
         print(f"Running process: {process_name} with season: {current_season}")

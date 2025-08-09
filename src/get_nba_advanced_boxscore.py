@@ -4,14 +4,14 @@ import requests
 
 from nba_api.stats.endpoints import boxscoreadvancedv3
 from nba_api.stats.library.parameters import LeagueID
-from common.utils import  (save_database_local, load_existing_boxscores,
+from common.utils import  (save_database, load_data,
                             AdvancedBoxscoreFileName) 
 from common.singleton_meta import SingletonMeta
 
 
 class AdvancedBoxscoreGames(metaclass=SingletonMeta):
 
-    def __init__(self, current_season: str) -> None:
+    def __init__(self, current_season: str, save_mode: str) -> None:
         """
         Initialize the BoxscoreGames class with the current season and season type.
             Args:
@@ -21,7 +21,7 @@ class AdvancedBoxscoreGames(metaclass=SingletonMeta):
         print(f"Initializing BoxscoreGames with season: {current_season}")
         self.current_season: str = current_season
         self.current_season_year: int = int(current_season.split("-")[0])
-
+        self.SAVE_MODE: str = save_mode
 
     def get_schedule(self) -> pd.DataFrame:
         """
@@ -128,7 +128,7 @@ class AdvancedBoxscoreGames(metaclass=SingletonMeta):
             pd.DataFrame: A DataFrame with the updated boxscore data.
         """
         # Load existing data if available
-        existing_df: pd.DataFrame = load_existing_boxscores(AdvancedBoxscoreFileName)
+        existing_df: pd.DataFrame = load_data(AdvancedBoxscoreFileName, mode=self.SAVE_MODE)
         if not existing_df.empty and "gameId" in existing_df.columns:
             # Get unique game IDs from the existing DataFrame
             processed_game_ids: set = set(existing_df["gameId"].unique())
@@ -194,4 +194,4 @@ class AdvancedBoxscoreGames(metaclass=SingletonMeta):
         advanced_boxscore_df: pd.DataFrame = self.get_boxscore_data(schedule_df_current_season)        
 
         # Save the combined DataFrame locally
-        save_database_local(advanced_boxscore_df, AdvancedBoxscoreFileName)    
+        save_database(advanced_boxscore_df, AdvancedBoxscoreFileName, mode= self.SAVE_MODE)    

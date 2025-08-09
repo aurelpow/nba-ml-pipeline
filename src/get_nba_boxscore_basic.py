@@ -5,7 +5,7 @@ import requests
 
 from nba_api.stats.endpoints import boxscoretraditionalv3
 from nba_api.stats.library.parameters import LeagueID
-from common.utils import  (save_database_local, load_existing_boxscores,
+from common.utils import  (save_database, load_data,
                             BoxscoreFileName) 
 from common.singleton_meta import SingletonMeta
  
@@ -20,7 +20,7 @@ http_lib.STATS_HEADERS['User-Agent'] = (
 
 class BoxscoreGames(metaclass=SingletonMeta):
 
-    def __init__(self, current_season: str) -> None:
+    def __init__(self, current_season: str, save_mode: str) -> None:
         """
         Initialize the BoxscoreGames class with the current season and season type.
             Args:
@@ -30,6 +30,7 @@ class BoxscoreGames(metaclass=SingletonMeta):
         print(f"Initializing BoxscoreGames with season: {current_season}")
         self.current_season: str = current_season
         self.current_season_year: int = int(current_season.split("-")[0])
+        self.SAVE_MODE: str = save_mode
 
     
     def get_schedule(self):
@@ -137,7 +138,7 @@ class BoxscoreGames(metaclass=SingletonMeta):
             pd.DataFrame: A DataFrame with the updated boxscore data.
         """
         # Load existing data if available
-        existing_df: pd.DataFrame = load_existing_boxscores(BoxscoreFileName)
+        existing_df: pd.DataFrame = load_data(BoxscoreFileName, mode= self.SAVE_MODE)
         if not existing_df.empty and "gameId" in existing_df.columns:
             # Get unique game IDs from the existing DataFrame
             processed_game_ids: set = set(existing_df["gameId"].unique())
@@ -204,4 +205,4 @@ class BoxscoreGames(metaclass=SingletonMeta):
         boxscore_df = self.get_boxscore_data(schedule_df_current_season)        
 
         # Save the combined DataFrame locally
-        save_database_local(boxscore_df, BoxscoreFileName)
+        save_database(boxscore_df, BoxscoreFileName, mode= self.SAVE_MODE)

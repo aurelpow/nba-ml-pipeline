@@ -1,5 +1,5 @@
 # Confidentials files
-common/confidentials.py 
+common/confidentials.py
 common/credentials.json
 credentials_encrypted.json
 

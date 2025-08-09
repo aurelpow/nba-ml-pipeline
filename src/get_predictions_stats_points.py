@@ -8,14 +8,14 @@ from sklearn.preprocessing import OneHotEncoder
 from common.singleton_meta import SingletonMeta
 from common.utils import (BoxscoreFileName, AdvancedBoxscoreFileName, 
                           PlayersFileName, FutureGamesFileName,
-                          PredictionsFileName, save_database_local)
+                          PredictionsFileName, save_database)
 
 class PredictionsStatsPoints(metaclass = SingletonMeta):
     """
     A class to fetch and update NBA player statistics for points predictions.
     """
 
-    def __init__(self, date: datetime.date, model_path: str) -> None:
+    def __init__(self, save_mode: str,  date: datetime.date, model_path: str) -> None:
         """
         Initialize the NBA player statistics data object.
             Args:
@@ -24,6 +24,7 @@ class PredictionsStatsPoints(metaclass = SingletonMeta):
         """
         self.date: datetime.date = datetime.datetime.strptime(date, "%Y-%m-%d").date()
         self.model_path: str = model_path
+        self.SAVE_MODE: str = save_mode
         self.keys_points_stats : list[str] = [
             'usagePercentage',
             'trueShootingPercentage',
@@ -90,18 +91,18 @@ class PredictionsStatsPoints(metaclass = SingletonMeta):
         )
 
         # Add position group based on the player df 'POSITION' column
-        futures_game_df['position_group'] : pd.DataFrame = futures_game_df['POSITION'].map(lambda x: 'G' if x in ('G', 'G-F') 
+        futures_game_df['position_group'] = futures_game_df['POSITION'].map(lambda x: 'G' if x in ('G', 'G-F') 
                                                                             else 'F' if x in ('F', 'F-G', 'F-C') 
                                                                             else 'C' if x in ('C', 'C-F') 
                                                                             else x 
                                                                             )
         
         # Add categorical features like is_home and season 
-        futures_game_df['is_home'] : pd.DataFrame = futures_game_df['TEAM_ID'] == futures_game_df['HOME_TEAM_ID']
-        futures_game_df['season']: pd.DataFrame = futures_game_df['GAME_ID'].astype(str).str[1:3].astype(int) + 2000
+        futures_game_df['is_home']= futures_game_df['TEAM_ID'] == futures_game_df['HOME_TEAM_ID']
+        futures_game_df['season'] = futures_game_df['GAME_ID'].astype(str).str[1:3].astype(int) + 2000
 
         # Change column date type to datetime 
-        futures_game_df['game_date'] : pd.DataFrame = pd.to_datetime(futures_game_df['GAME_DATE_EST'])
+        futures_game_df['game_date'] = pd.to_datetime(futures_game_df['GAME_DATE_EST'])
 
         return futures_game_df
 
@@ -436,6 +437,6 @@ class PredictionsStatsPoints(metaclass = SingletonMeta):
         predictions_df = self.get_predictions(future_games_long_df, X_pred_df, model)
 
         # Save the predictions to a CSV file
-        save_database_local(predictions_df,PredictionsFileName)
+        save_database(predictions_df,PredictionsFileName, mode=self.SAVE_MODE)
         
         return predictions_df

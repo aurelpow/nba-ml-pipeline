@@ -18,10 +18,10 @@ COPY common/ ./common
 COPY run_all.sh .
 
 # 3) Copy your model artifact(s)
-COPY ml_dev/models/best_lgbm_model_v2.pkl ml_dev/models/
-
+#COPY ml_dev/models/best_lgbm_model_v2.pkl ml_dev/models/
+RUN mkdir -p ml_dev/models
 # 4) Ensure run_all.sh is executable
 RUN chmod +x run_all.sh
 
-# 5) Use your launcher as the entrypoint
+# 5) Use  launcher as the entrypoint
 ENTRYPOINT ["./run_all.sh"]
