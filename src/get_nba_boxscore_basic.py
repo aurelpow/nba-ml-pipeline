@@ -26,6 +26,7 @@ class BoxscoreGames(metaclass=SingletonMeta):
             Args:
                 current_season (str): The current season in the format "YYYY-YY".
                 season_type (str): The type of season, e.g., "Regular Season", "Playoffs".
+                save_mode (str): The mode to save data, either 'local' or 'bq' (google bigquery). 
         """
         print(f"Initializing BoxscoreGames with season: {current_season}")
         self.current_season: str = current_season

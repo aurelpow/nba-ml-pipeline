@@ -8,7 +8,8 @@ from sklearn.preprocessing import OneHotEncoder
 from common.singleton_meta import SingletonMeta
 from common.utils import (BoxscoreFileName, AdvancedBoxscoreFileName, 
                           PlayersFileName, FutureGamesFileName,
-                          PredictionsFileName, save_database)
+                          PredictionsFileName, save_database,
+                          load_model_artifact)
 
 class PredictionsStatsPoints(metaclass = SingletonMeta):
     """
@@ -21,6 +22,7 @@ class PredictionsStatsPoints(metaclass = SingletonMeta):
             Args:
                 date (datetime.date): The date to start fetching stats from. Format: YYYY-MM-DD.
                 days_number (int): The number of days to fetch stats for.
+                save_mode (str): The mode to save data, either 'local' or 'bq' (google bigquery). 
         """
         self.date: datetime.date = datetime.datetime.strptime(date, "%Y-%m-%d").date()
         self.model_path: str = model_path
@@ -37,13 +39,6 @@ class PredictionsStatsPoints(metaclass = SingletonMeta):
             'avg_pts_opp_position_last_10',
             'avg_pts_opp_position_last_20'
         ]
-
-    def load_model(self) -> joblib:
-        """
-        Load the prediction model from the specified path.
-        """
-        # Load the model using joblib or any other method
-        return joblib.load(self.model_path)
     
     def load_data(self) -> dict: 
         """
@@ -425,7 +420,7 @@ class PredictionsStatsPoints(metaclass = SingletonMeta):
             pd.DataFrame: A DataFrame with player statistics ready for predictions.
         """
         # Load the model
-        model = self.load_model()
+        model = load_model_artifact(self.model_path, mode=self.SAVE_MODE)
         
         # Load the data
         data_map = self.load_data()
