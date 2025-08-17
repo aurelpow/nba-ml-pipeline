@@ -12,7 +12,7 @@ def build_parser(parser:argparse.ArgumentParser):
     """
     # Add arguments to the parser
     parser.add_argument("-p", "--process", type=str, required=True, help="Name of the process to run")
-    parser.add_argument("-s", "--season", type=str, required=True, help="Current season to run the process for")
+    parser.add_argument("-s", "--season", type=str, default=None, help="Current season to run the process for")
     parser.add_argument("-sm", "--save_mode", type=str, default="bq", choices=["bq", "local"], help="Where to save the output ('bq' or 'local')")
     parser.add_argument("-st","--season_type", type=str, default=None, help="Type of season to run the process for")
     parser.add_argument("-d","--date", type=str, default=None, help="Date to run the process for (optional)")

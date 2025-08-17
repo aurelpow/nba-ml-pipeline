@@ -9,6 +9,7 @@ RUN apt-get update \
 
 # 1) Install Python deps
 COPY requirements.txt .
+RUN pip install --upgrade pip
 RUN pip install --no-cache-dir -r requirements.txt
 
 # 2) Copy application code
@@ -17,9 +18,8 @@ COPY src/    ./src
 COPY common/ ./common
 COPY run_all.sh .
 
-
-# 4) Ensure run_all.sh is executable
+# 3) Ensure run_all.sh is executable
 RUN chmod +x run_all.sh
 
-# 5) Use  launcher as the entrypoint
+# 4) Use  launcher as the entrypoint
 ENTRYPOINT ["./run_all.sh"]

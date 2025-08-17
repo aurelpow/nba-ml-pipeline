@@ -50,7 +50,7 @@ def main():
     
     elif process_name == "get_nba_boxscore_basic":
         print(f"Running process: {process_name} with season: {current_season}")
-        BoxscoreGames(current_season, season_type, save_mode=save_mode).run()
+        BoxscoreGames(current_season, save_mode=save_mode).run()
 
     elif process_name == "get_future_games":
         print(f"Running process: {process_name} with season: {current_season}")
@@ -58,7 +58,7 @@ def main():
     
     elif process_name == "get_nba_advanced_boxscore":
         print(f"Running process: {process_name} with season: {current_season}")
-        AdvancedBoxscoreGames(current_season, season_type, save_mode=save_mode).run()
+        AdvancedBoxscoreGames(current_season, save_mode=save_mode).run()
 
     elif process_name == "get_predictions_stats_points":
         print(f"Running process: {process_name} with date: {date} and model path:{model_path}")
