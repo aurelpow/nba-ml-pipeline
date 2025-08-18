@@ -103,10 +103,9 @@ class AdvancedBoxscoreGames(metaclass=SingletonMeta):
             pd.DataFrame: The boxscore DataFrame for the game or an empty DataFrame on error.
         """
         try:
-            # Increase timeout if needed (here, timeout=1 second)
             boxscore: pd.DataFrame = boxscoreadvancedv3.BoxScoreAdvancedV3(
                 game_id=game_id, 
-                timeout=0.600
+                timeout=1
             ).get_data_frames()[0]
             print(f"Fetched boxscore for game ID {game_id}")
             return boxscore

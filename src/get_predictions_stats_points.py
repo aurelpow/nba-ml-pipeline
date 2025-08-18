@@ -1,5 +1,4 @@
 import datetime
-import joblib
 import pandas as pd
 import numpy as np 
 
@@ -45,16 +44,27 @@ class PredictionsStatsPoints(metaclass = SingletonMeta):
         Load the necessary data for predictions.
         This method should be implemented to fetch the required data.
         """
-        
-        boxscore_df = pd.read_csv(f"databases/{BoxscoreFileName}.csv", low_memory=False)
-        advanced_boxscore_df = pd.read_csv(f"databases/{AdvancedBoxscoreFileName}.csv", low_memory=False)
-        players_df = pd.read_csv(f"databases/{PlayersFileName}.csv")
-        future_games_df = pd.read_csv(f"databases/{FutureGamesFileName}.csv")
-        
-        return {"simple_boxscore" : boxscore_df,
-                "advanced_boxscore" : advanced_boxscore_df,
-                "players" : players_df,
-                "future_games" : future_games_df}
+        if self.SAVE_MODE == "local":
+            boxscore_df = pd.read_csv(f"databases/{BoxscoreFileName}.csv", low_memory=False)
+            advanced_boxscore_df = pd.read_csv(f"databases/{AdvancedBoxscoreFileName}.csv", low_memory=False)
+            players_df = pd.read_csv(f"databases/{PlayersFileName}.csv")
+            future_games_df = pd.read_csv(f"databases/{FutureGamesFileName}.csv") 
+
+            return {"simple_boxscore" : boxscore_df,
+                    "advanced_boxscore" : advanced_boxscore_df,
+                    "players" : players_df,
+                    "future_games" : future_games_df}
+        elif self.SAVE_MODE == "bq":
+            from common.utils import load_data
+            boxscore_df = load_data(BoxscoreFileName, mode=self.SAVE_MODE)
+            advanced_boxscore_df = load_data(AdvancedBoxscoreFileName, mode=self.SAVE_MODE)
+            players_df = load_data(PlayersFileName, mode=self.SAVE_MODE)
+            future_games_df = load_data(FutureGamesFileName, mode=self.SAVE_MODE)
+
+            return {"simple_boxscore" : boxscore_df,
+                    "advanced_boxscore" : advanced_boxscore_df,
+                    "players" : players_df,
+                    "future_games" : future_games_df}
     
 
     def get_future_games_players(self, data_map : dict):

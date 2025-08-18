@@ -40,48 +40,45 @@ class NbaPlayersData(metaclass=SingletonMeta):
         self.BASE_BACKOFF: int = 1.5
 
 
-    def _with_retry_fetch_players(self) -> pd.DataFrame:
+    def _with_retry_fetch_players(self) -> pd.DataFrame | None:
         """
         Call NBA PlayerIndex with retries, exponential backoff, and jitter.
+        If all retries fail, return None instead of raising.
         """
         last_err = None
         for attempt in range(1, self.MAX_TRIES + 1):
             try:
-                # Pass timeout directly to the endpoint (this actually works; the class var often doesn't)
                 df = playerindex.PlayerIndex(season=self.current_season, timeout=self.DEFAULT_TIMEOUT).get_data_frames()[0]
                 return df
-
             except (ReadTimeout, Timeout, ReqConnectionError, requests.HTTPError) as e:
                 last_err = e
-                # Backoff with jitter to play nice with CDN/rate-limits
                 sleep_s = self.BASE_BACKOFF * (2 ** (attempt - 1)) + random.uniform(0, 0.75)
-                # Optional: cap the backoff if you prefer
                 sleep_s = min(sleep_s, 20)
-                print(f"[retry {attempt}/self.{self.MAX_TRIES}] NBA API error: {repr(e)}; sleeping {sleep_s:.1f}s...")
+                print(f"[retry {attempt}/{self.MAX_TRIES}] NBA API error: {repr(e)}; sleeping {sleep_s:.1f}s...")
                 time.sleep(sleep_s)
+        # All retries failed, skip process
+        print(f"❌ Failed to fetch PlayerIndex for season {self.current_season} after {self.MAX_TRIES} attempts. Skipping process.")
+        return None
 
-        # If we got here, all retries failed
-        raise RuntimeError(f"Failed to fetch PlayerIndex for season {self.current_season} after {self.MAX_TRIES} attempts") from last_err
-
-    def get_nba_players_index(self) -> pd.DataFrame:
+    def get_nba_players_index(self) -> pd.DataFrame | None:
         """
         Fetch NBA players data from the NBA stats API and clean it.
         """
-        # Get a list of all NBA teams (each team is represented as a dictionary)
         print("Fetching Active NBA players data from API...")
-        playerindex_df: pd.DataFrame =  playerindex.PlayerIndex(season=self.current_season).get_data_frames()[0]
-
-        return playerindex_df
-
+        try:
+            playerindex_df: pd.DataFrame = playerindex.PlayerIndex(season=self.current_season).get_data_frames()[0]
+            return playerindex_df
+        except (ReadTimeout, Timeout, ReqConnectionError, requests.HTTPError) as e:
+            print(f"❌ Error fetching NBA players index: {repr(e)}. Skipping process.")
+            return None
 
     def run(self) -> None:
         """
         Run the process to fetch and update NBA players data.
         """
-
-        # Get detailed player information for the active players
-        players_df: pd.DataFrame = self._with_retry_fetch_players()
-        
-        # Save the df as .csv file in the databases folder
-        save_database(players_df, self.file_name, mode = self.SAVE_MODE)
-        print(f"✅ Players data saved with mode: {self.SAVE_MODE}")
+        players_df: pd.DataFrame | None = self._with_retry_fetch_players()
+        if players_df is not None:
+            save_database(players_df, self.file_name, mode=self.SAVE_MODE)
+            print(f"✅ Players data saved with mode: {self.SAVE_MODE}")
+        else:
+            print("⚠️ No players data fetched. Process skipped.")
