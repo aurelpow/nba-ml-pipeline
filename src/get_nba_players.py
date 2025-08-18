@@ -5,13 +5,12 @@ from common.utils import  PlayersFileName, save_database
 
 
 from nba_api.stats.endpoints import playerindex
-import nba_api.stats.library.http as http_lib
 import nba_api.stats.library.http as http
 import time 
 import random
 import requests
 from requests.exceptions import ReadTimeout, Timeout, ConnectionError as ReqConnectionError
-http_lib._NBAStatsHTTP__timeout = 60
+http._NBAStatsHTTP__timeout = 60
 # Make the NBA-API pretend to be a browser
 http.NBAStatsHTTP.headers.update({
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
