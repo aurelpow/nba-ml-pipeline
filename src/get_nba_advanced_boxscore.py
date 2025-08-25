@@ -1,111 +1,129 @@
+import time
+import random
 import pandas as pd
-import nba_api.stats.library.http as http_lib
 import requests 
 
 from nba_api.stats.endpoints import boxscoreadvancedv3
 from nba_api.stats.library.parameters import LeagueID
-from common.utils import  (save_database, load_data,
-                            AdvancedBoxscoreFileName) 
+from common.io_utils import  (save_database, load_data,
+                            AdvancedBoxscoreFileName)
+from common.utils import  nba_api_timeout
 from common.singleton_meta import SingletonMeta
 
 
 class AdvancedBoxscoreGames(metaclass=SingletonMeta):
+    """
+    A class to fetch and NBA advanced boxscore data for all games in a specific season.
+    """
 
-    def __init__(self, current_season: str, save_mode: str) -> None:
+    def __init__(self, current_season: str, save_mode: str, 
+                 proxy_user: str = None, proxy_pass: str = None) -> None:
         """
         Initialize the BoxscoreGames class with the current season and season type.
             Args:
                 current_season (str): The current season in the format "YYYY-YY".
-                season_type (str): The type of season, e.g., "Regular Season", "Playoffs".
                 save_mode (str): The mode to save data, either 'local' or 'bq' (google bigquery). 
+                proxy_user (str, optional): Proxy username if needed. Defaults to None.
+                proxy_user (str, optional): Proxy password if needed. Defaults to None.
         """
         print(f"Initializing BoxscoreGames with season: {current_season}")
         self.current_season: str = current_season
         self.current_season_year: int = int(current_season.split("-")[0])
         self.SAVE_MODE: str = save_mode
+        # Build proxy string only if not running locally
+        if self.SAVE_MODE != "local" and proxy_user and proxy_pass:
+            self.proxy: str = f"http://{proxy_user}:{proxy_pass}@gate.decodo.com:10001"
+        else:
+            self.proxy: str = None
 
     def get_schedule(self) -> pd.DataFrame:
-        """
-        Fetches and processes NBA schedule data for a given season year.
-        
-        Args:
-            current_season_year (int): The year of the season (default: 2024)
+            """
+            Fetch and process NBA schedule for self.current_season_year.
+            Only regular season & playoffs are returned.
+            Args:
+                None
+            Returns:
+                pd.DataFrame: Processed schedule data
+            """
+            # Define the URL for the NBA schedule data
+            url = (
+                f"https://data.nba.com/data/10s/v2015/json/mobile_teams/nba/"
+                f"{self.current_season_year}/league/{LeagueID.default}_full_schedule.json"
+            )
             
-        Returns:
-            pandas.DataFrame: Processed schedule data
-        """
-        # Define the URL for the NBA schedule data
-        url: str = f"http://data.nba.com/data/10s/v2015/json/mobile_teams/nba/{self.current_season_year}/league/{LeagueID.default}_full_schedule.json"
-        
-        # Get the data
-        r = requests.get(url)
-        data = r.json()
+            # Get the data
+            r = requests.get(url)
+            data = r.json()
 
-        # Initialize an empty list to store all games
-        all_games_list = []
-        
-        # Iterate through the league schedule data
-        for month in data['lscd']:
-            # Extract games from each month
-            if 'mscd' in month and 'g' in month['mscd']:
-                games = month['mscd']['g']
-                all_games_list.extend(games)
+            # Initialize an empty list to store all games
+            all_games_list = []
+            
+            # Iterate through the league schedule data
+            for month in data['lscd']:
+                # Extract games from each month
+                if 'mscd' in month and 'g' in month['mscd']:
+                    games = month['mscd']['g']
+                    all_games_list.extend(games)
 
-        # Convert the list of games to a DataFrame
-        games_df = pd.json_normalize(all_games_list)
+            # Convert the list of games to a DataFrame
+            games_df = pd.json_normalize(all_games_list)
 
-        # Rename the columns to be more readable
-        games_df: pd.DataFrame = games_df.rename(columns={
-            'gid': 'game_id',
-            'seri': 'playoffs_desc',
-            'st': 'game_status',
-            'stt': 'game_status_text',
-            'gdte': 'game_date',
-            'h.tid': 'home_team_id',
-            'h.ta': 'home_team_tricode',
-            'v.tid': 'visitor_team_id',
-            'v.ta': 'visitor_team_tricode',
-        })
+            # Rename the columns to be more readable
+            games_df = games_df.rename(columns={
+                'gid': 'game_id',
+                'seri': 'playoffs_desc',
+                'st': 'game_status',
+                'stt': 'game_status_text',
+                'gdte': 'game_date',
+                'h.tid': 'home_team_id',
+                'h.ta': 'home_team_tricode',
+                'v.tid': 'visitor_team_id',
+                'v.ta': 'visitor_team_tricode',
+            })
 
-        # Flag if games are in the playoffs
-        games_df['is_playoffs'] = games_df['game_id'].str.startswith('004')
-        # Flag if games are in the Regular Season 
-        games_df['is_regular_season'] = games_df['game_id'].str.startswith('002')
-        # Remove games not in regular season or playoffs
-        games_df: pd.DataFrame = games_df[games_df['is_playoffs'] | games_df['is_regular_season']]
+            # Flag if games are in the playoffs
+            games_df['is_playoffs'] = games_df['game_id'].str.startswith('004')
+            
+            # Flag if games are in the Regular Season 
+            games_df['is_regular_season'] = games_df['game_id'].str.startswith('002')
 
-        # Select and order columns
-        games_df: pd.DataFrame = games_df[[
-            "game_id",
-            "is_regular_season",
-            "is_playoffs",
-            "playoffs_desc",
-            "game_date",
-            "home_team_id",
-            "home_team_tricode",
-            "visitor_team_id",
-            "visitor_team_tricode",
-            "game_status",
-            "game_status_text"
-        ]]
+            # Remove games not in regular season or playoffs
+            games_df = games_df[games_df['is_playoffs'] | games_df['is_regular_season']]
 
-        return games_df
+            # Select and order columns
+            games_df = games_df[[
+                "game_id",
+                "is_regular_season",
+                "is_playoffs",
+                "playoffs_desc",
+                "game_date",
+                "home_team_id",
+                "home_team_tricode",
+                "visitor_team_id",
+                "visitor_team_tricode",
+                "game_status",
+                "game_status_text"
+            ]]
+
+            return games_df
 
     @staticmethod
-    def fetch_boxscore(game_id: str) -> pd.DataFrame:
+    def fetch_boxscore(game_id: str, proxy_arg) -> pd.DataFrame:
         """
         Helper function to fetch a single game's boxscore.
         
         Args:
             game_id (str): The game ID.
+            proxy_arg (str): The proxy string.
             
         Returns:
             pd.DataFrame: The boxscore DataFrame for the game or an empty DataFrame on error.
         """
         try:
             boxscore: pd.DataFrame = boxscoreadvancedv3.BoxScoreAdvancedV3(
-                game_id=game_id, 
-                timeout=1
+                game_id=game_id,
+                proxy=proxy_arg, 
+                timeout=nba_api_timeout
             ).get_data_frames()[0]
             print(f"Fetched boxscore for game ID {game_id}")
             return boxscore
@@ -113,75 +131,77 @@ class AdvancedBoxscoreGames(metaclass=SingletonMeta):
         except Exception as e:
             print(f"Error fetching boxscore for game ID {game_id}: {e}")
             return pd.DataFrame() 
-        
 
     def get_boxscore_data(self, schedule_df: pd.DataFrame) -> pd.DataFrame:
         """
-        Retrieves boxscore data for new game IDs.
-        
-        Compares against a local CSV to avoid re-fetching.
-        
+        Retrieves Advanced boxscore data for new game IDs.
+        Compares against data already persisted to avoid re-fetching.
         Args:
-            game_id_list (list): A list of game IDs from the API.
-        
+            schedule_df (pd.DataFrame): The schedule DataFrame with game IDs.     
         Returns:
             pd.DataFrame: A DataFrame with the updated boxscore data.
         """
         # Load existing data if available
         existing_df: pd.DataFrame = load_data(AdvancedBoxscoreFileName, mode=self.SAVE_MODE)
-        if not existing_df.empty and "gameId" in existing_df.columns:
-            # Get unique game IDs from the existing DataFrame
-            processed_game_ids: set = set(existing_df["gameId"].unique())
+
+        if not existing_df.empty and "gameId" in existing_df.columns: # only if existing data has gameId col
+            if self.SAVE_MODE == "bq": # In BQ gameID is stored as string (so we already have 00 prefix)
+                 processed_game_ids: set = set(existing_df["gameId"].astype(str).unique())
+            else: # In local CSV gameID is stored as int (no leading zeros)
+                processed_game_ids: set = {f"00{gid}" for gid in existing_df["gameId"].astype(int).unique()}
             # Convert game IDs to string format with leading zeros
-            processed_game_ids = {f"00{gid}" for gid in processed_game_ids}
-        else:
+        else: # Empty existing data 
             processed_game_ids: set = set()
         
-        # Filter the schedule DataFrame to only include games that are completed
-        schedule_df: pd.DataFrame = schedule_df[schedule_df["game_status"] == "3"]
-        # Get the list of game IDs from the API DataFrame
-        game_id_list: list = schedule_df["game_id"].tolist()
+        # Filter schedule to only ended games (status "3"
+        schedule_df = schedule_df[schedule_df["game_status"] == "3"]
 
-        # Filter game IDs to only new ones
-        new_game_ids: list = [gid for gid in game_id_list if gid not in processed_game_ids]
-        print(f"Total game IDs: {len(game_id_list)}; New game IDs to process: {len(new_game_ids)}")
+        # Create List of Ended game IDs 
+        game_id_list = schedule_df["game_id"].astype(str).tolist()
 
-        # Create an empty list to store new results
+        # Identify new game IDs to process 
+        new_game_ids = [gid for gid in game_id_list if gid not in processed_game_ids]
+        
+        # Print total of games and new to process
+        print(f"Total finals: {len(game_id_list)}; New to process: {len(new_game_ids)}")
+
+        # With a loop over new game IDs, fetch boxscores using function above
         new_results = []
-        # Use a loop over new game IDs to fetch boxscores
-        for game_id in new_game_ids:
-            result_df = self.fetch_boxscore(game_id)
+        for i, game_id in enumerate(new_game_ids, 1):
+            print(f"[{i}/{len(new_game_ids)}] Fetching {game_id}...")
+            result_df = self.fetch_boxscore(game_id, self.proxy)
             if not result_df.empty:
                 new_results.append(result_df)
             else:
                 print(f"Failed to fetch boxscore for game ID {game_id}")
-
-        # Combine new results with existing data if any new data was fetched
-        if new_results:
-            # Filter out any DataFrame that is empty or all NA before concatenation.
-            new_results = [df for df in new_results if not df.empty and not df.isna().all().all()]
-            if new_results:
-                new_boxscores_df: pd.DataFrame = pd.concat(new_results, ignore_index=True)
-                # Merge with scheduke DataFrame to add game details
-                new_boxscores_df: pd.DataFrame = new_boxscores_df.merge(
-                schedule_df, 
-                left_on="gameId",
-                right_on="game_id",
-                how="left"
-            )
-                
-            else : new_boxscores_df: pd.DataFrame = pd.DataFrame()
-            
-            if not existing_df.empty:
-                final_df:pd.DataFrame = pd.concat([existing_df, new_boxscores_df], ignore_index=True)
-            else:
-                final_df: pd.DataFrame = new_boxscores_df
-            
-
-            return final_df
-        else:
+            # polite pacing between calls (randomized)
+            time.sleep(random.uniform(0.6, 1.2))               
+        
+        # Check if we have new games fetched
+        if not new_results:
             print("No new boxscore data to fetch.")
-            return existing_df  
+            return existing_df
+        
+        # Concatenate all new results into a Pandas DataFrame
+        new_boxscores_df: pd.DataFrame = pd.concat(new_results, ignore_index=True)                
+
+        # Merge with schedule to get more metadata
+        new_boxscores_df: pd.DataFrame = new_boxscores_df.merge(
+            schedule_df,
+            left_on="gameId",
+            right_on="game_id",
+            how="left",
+        )
+        
+        # Combine with existing data if any
+        final_df: pd.DataFrame = (
+            pd.concat([existing_df, new_boxscores_df], ignore_index=True)
+            if not existing_df.empty
+            else new_boxscores_df
+        )
+
+        return final_df
+      
         
     def run(self):
         """

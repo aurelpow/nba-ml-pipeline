@@ -1,6 +1,6 @@
 import pandas as pd 
 from nba_api.stats.static import teams
-from common.utils import  TeamsFileName, save_database
+from common.io_utils import  TeamsFileName, save_database
 from common.singleton_meta import SingletonMeta
 
 class NbaTeamsData(metaclass=SingletonMeta):
@@ -35,7 +35,12 @@ class NbaTeamsData(metaclass=SingletonMeta):
         """
         Run the process to fetch and update NBA teams data.
         """
-        nba_teams_df: pd.DataFrame = self.get_nba_teams()
-
-        save_database(nba_teams_df, TeamsFileName, mode=self.SAVE_MODE)
-        print(f"✅ Teams data saved with mode: {self.SAVE_MODE}")
+        try:
+            nba_teams_df: pd.DataFrame = self.get_nba_teams()
+            if nba_teams_df is not None and not nba_teams_df.empty:
+                save_database(nba_teams_df, TeamsFileName, mode=self.SAVE_MODE)
+                print(f"✅ Teams data saved with mode: {self.SAVE_MODE}")
+            else:
+                print("⚠️ No teams data fetched. Process skipped.")
+        except Exception as e:
+            print(f"❌ Failed to fetch players: {e}")

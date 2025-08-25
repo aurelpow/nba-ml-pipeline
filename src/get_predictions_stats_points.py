@@ -5,7 +5,7 @@ import numpy as np
 from sklearn.preprocessing import OneHotEncoder
 
 from common.singleton_meta import SingletonMeta
-from common.utils import (BoxscoreFileName, AdvancedBoxscoreFileName, 
+from common.io_utils import (BoxscoreFileName, AdvancedBoxscoreFileName, 
                           PlayersFileName, FutureGamesFileName,
                           PredictionsFileName, save_database,
                           load_model_artifact)
@@ -55,7 +55,7 @@ class PredictionsStatsPoints(metaclass = SingletonMeta):
                     "players" : players_df,
                     "future_games" : future_games_df}
         elif self.SAVE_MODE == "bq":
-            from common.utils import load_data
+            from common.io_utils import load_data
             boxscore_df = load_data(BoxscoreFileName, mode=self.SAVE_MODE)
             advanced_boxscore_df = load_data(AdvancedBoxscoreFileName, mode=self.SAVE_MODE)
             players_df = load_data(PlayersFileName, mode=self.SAVE_MODE)

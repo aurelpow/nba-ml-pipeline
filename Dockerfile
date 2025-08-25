@@ -18,8 +18,12 @@ COPY src/    ./src
 COPY common/ ./common
 COPY run_all.sh .
 
-# 3) Ensure run_all.sh is executable
-RUN chmod +x run_all.sh
+# 3) Ensure run_all.sh has proper line endings and is executable
+RUN apt-get update && apt-get install -y --no-install-recommends dos2unix \
+  && dos2unix run_all.sh \
+  && chmod +x run_all.sh \
+  && apt-get purge -y dos2unix && apt-get autoremove -y \
+  && rm -rf /var/lib/apt/lists/*
 
 # 4) Use  launcher as the entrypoint
 ENTRYPOINT ["./run_all.sh"]

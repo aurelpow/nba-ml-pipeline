@@ -7,24 +7,33 @@ from nba_api.stats.library.parameters import SeasonNullable
 from nba_api.stats.endpoints import leaguegamefinder
 from nba_api.stats.library.parameters import LeagueID
 from common.singleton_meta import SingletonMeta
-from common.utils import FutureGamesFileName, save_database
-
+from common.io_utils import FutureGamesFileName, save_database
+from common.utils import  nba_api_timeout
 
 class NbaGamesLog(metaclass=SingletonMeta):
     """
     A class to fetch and update NBA future games data.
     """
 
-    def __init__(self, save_mode: int, date: datetime.date,  days_number: int) -> None:
+    def __init__(self, save_mode: int, date: datetime.date,  days_number: int,
+                 proxy_user: str = None, proxy_pass: str = None) -> None:
         """
         Initialize the NBA future games data object.
             Args:
+                save_mode (str): 'local' or 'bq'
                 date (datetime.date): The date to start fetching games from. Format: YYYY-MM-DD.
                 days_number (int): The number of days to fetch games for.
+                proxy_user (str, optional): Proxy username if needed. Defaults to None.
+                proxy_user (str, optional): Proxy password if needed. Defaults to None.
         """
         self.date: datetime.date = datetime.datetime.strptime(date, "%Y-%m-%d").date()
         self.days_number: int = days_number
         self.SAVE_MODE: int = save_mode
+        # Build proxy string only if not running locally
+        if self.SAVE_MODE != "local" and proxy_user and proxy_pass:
+            self.proxy: str = f"http://{proxy_user}:{proxy_pass}@gate.decodo.com:10001"
+        else:
+            self.proxy: str = None
 
     def get_start_date(self) -> datetime.date:
         # Define the start and end dates for the range 
@@ -45,7 +54,9 @@ class NbaGamesLog(metaclass=SingletonMeta):
         games_df: pd.DataFrame = leaguegamefinder.LeagueGameFinder(
             season_nullable=self.current_season,
             league_id_nullable=LeagueID.nba,
-            season_type_nullable=self.season_type
+            season_type_nullable=self.season_type,
+            proxy=self.proxy,
+            timeout=nba_api_timeout
         ).get_data_frames()[0]
 
         # Get unique game IDs and date from the DataFrame
@@ -73,7 +84,12 @@ class NbaGamesLog(metaclass=SingletonMeta):
                 game_date_str = current_date.strftime("%m/%d/%Y")
     
                 # Retrieve the scoreboard for the current date
-                scoreboard = scoreboardv2.ScoreboardV2(game_date=game_date_str, league_id="00")
+                scoreboard = scoreboardv2.ScoreboardV2(
+                    game_date=game_date_str,
+                      league_id=LeagueID.nba,
+                      proxy=self.proxy,
+                      timeout=nba_api_timeout
+                      )
                 
                 # Extract the game header DataFrame
                 game_header_df = scoreboard.game_header.get_data_frame()
@@ -118,10 +134,10 @@ class NbaGamesLog(metaclass=SingletonMeta):
             pd.DataFrame: A DataFrame with game information for the date range.
         """
         # Get the end date 
-        end_date = self.get_end_date()
+        end_date: datetime = self.get_end_date()
         
         # Fetch the games from the API
-        games_df = self.get_games_from_api(end_date)
+        games_df: pd.DataFrame = self.get_games_from_api(end_date)
 
         # Save the DataFrame locally (optional)
         save_database(games_df, FutureGamesFileName, mode=self.SAVE_MODE)
