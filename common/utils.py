@@ -1,12 +1,51 @@
-""
-"This module contains common utility functions and constants for NBA data processing."
+"""
+This module contains common utility functions for NBA data processing.
+"""
+import pandas as pd 
+import numpy as np 
 
-# Nba api timeout
-nba_api_timeout: int = 20 
-# Number of retries for nba api requests
-max_retries: int = 3
-# Delay between retries in seconds
-retry_delay: int = 5
-nba_api_header_user_agent: dict = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-}
+# Function to extract season from game_id
+def extract_season(game_id):
+    """
+    Extract the season year from a given game_id.
+    Args:
+        game_id (str or int): The game ID from which to extract the season.
+        Returns:
+        int: The extracted season year (e.g., 2023 for the 2023-24 season).
+    """
+    try:
+        if pd.isnull(game_id):
+            return np.nan
+        if len(str(game_id)) == 8:
+            gid = str(game_id)[1:3]
+            return int(gid) + 2000
+        
+        if game_id.startswith('00'):
+            gid = game_id[3:5]
+            return int(gid) + 2000
+    except Exception:
+        return np.nan
+
+# Function to transform minutes from string to float
+def parse_minutes(val):
+    """
+    Convert 'MM:SS' or 'H:MM:SS' to minutes (float).
+    Args:
+        val (str or float): The minutes string or numeric value.    
+        Returns:
+            float: The total minutes as a float.
+    """
+    if pd.isna(val) or val == '':
+        return 0.0
+    try:
+        parts = str(val).split(':')
+        if len(parts) == 2:  # MM:SS
+            m, s = map(int, parts)
+            return m + s / 60
+        elif len(parts) == 3:  # H:MM:SS
+            h, m, s = map(int, parts)
+            return h * 60 + m + s / 60
+        else:
+            return float(val)  # already numeric
+    except Exception:
+        return 0.0  # fallback if unexpected format

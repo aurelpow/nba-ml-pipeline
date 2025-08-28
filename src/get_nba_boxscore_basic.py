@@ -7,7 +7,7 @@ from nba_api.stats.endpoints import boxscoretraditionalv3
 from nba_api.stats.library.parameters import LeagueID
 
 from common.io_utils import save_database, load_data, BoxscoreFileName
-from common.utils import  nba_api_timeout
+from common.constants import  nba_api_timeout
 from common.singleton_meta import SingletonMeta
 
 class BoxscoreGames(metaclass=SingletonMeta):

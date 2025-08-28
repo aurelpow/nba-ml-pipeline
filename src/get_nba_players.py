@@ -4,7 +4,7 @@ from nba_api.stats.endpoints import playerindex
 
 from common.singleton_meta import SingletonMeta
 from common.io_utils import PlayersFileName, save_database
-from common.utils import  nba_api_timeout
+from common.constants import  nba_api_timeout
 
 
 

@@ -8,6 +8,8 @@ from google.cloud import bigquery
 from google.cloud import storage
 import joblib
 import tempfile
+from typing import Optional, Iterable
+from google.api_core.exceptions import NotFound, BadRequest
 
 # Define the names of the files to be used in the databases folder.
 AdvancedBoxscoreFileName: str = "nba_boxscore_advanced" 
@@ -19,7 +21,102 @@ PredictionsFileName: str = 'nba_points_predictions_df'
 
 # Define the path to the databases folder.
 databases_path: str = "databases/"
+PROJECT_ID = "ml-nba-project"
+DATASET_ID = "nba_dataset"
 
+def _table_ref(table_name: str) -> str:
+    return f"{PROJECT_ID}.{DATASET_ID}.{table_name}"
+
+def _normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Normalize dataframe columns to match BigQuery naming rules.
+    - lowercase all column names
+    """
+    df: pd.DataFrame = df.copy()
+    df.columns = [col.lower() for col in df.columns]
+    return df
+
+def _delete_rows_by_game_id(client: bigquery.Client, table_id: str, game_ids: Iterable) -> int:
+    game_ids = list({str(gid) for gid in game_ids if pd.notna(gid)})
+    if not game_ids:
+        return 0
+
+    query = f"""
+    DELETE FROM `{table_id}`
+    WHERE GAME_ID IN UNNEST(@game_ids)
+    """
+    job = client.query(
+        query,
+        job_config=bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ArrayQueryParameter("game_ids", "STRING", game_ids)
+            ]
+        ),
+    )
+    job.result()
+    return getattr(job, "num_dml_affected_rows", 0) or 0
+
+def save_database(
+    df: pd.DataFrame,
+    table_name: str,
+    mode: str = "bq",
+    write_disposition: str = "WRITE_TRUNCATE",
+    autodetect_schema: bool = True,
+) -> None:
+    """
+    Save a DataFrame either locally or to BigQuery.
+    - If df has GAME_ID column: delete matching rows before append
+    - Else: overwrite table (default WRITE_TRUNCATE)
+    """
+    if df is None or df.empty:
+        print("⚠️ DataFrame empty; nothing to save.")
+        return
+
+    # Normalize columns before any processing
+    df = _normalize_columns(df)
+    # Add aud_modification_date column (datetime)
+    df["aud_modification_date"] = pd.Timestamp.now(tz="UTC+2")
+
+    if mode == "local":
+        path = f"databases/{table_name}.csv"
+        df.to_csv(path, index=False)
+        print(f"✅ Saved locally to: {path}")
+        return
+
+    if mode != "bq":
+        raise ValueError("Invalid mode: choose 'local' or 'bq'")
+
+    client = bigquery.Client()
+    table_id = _table_ref(table_name)
+
+    has_game_id = "game_id" in df.columns
+
+    if has_game_id:
+        unique_ids = df["GAME_ID"].astype(str).dropna().unique().tolist()
+        deleted = _delete_rows_by_game_id(client, table_id, unique_ids)
+        print(f"🧹 Deleted {deleted} rows in {table_id} for {len(unique_ids)} GAME_ID(s).")
+
+        load_config = bigquery.LoadJobConfig(
+            write_disposition="WRITE_APPEND",
+            autodetect=autodetect_schema,
+        )
+    else:
+        load_config = bigquery.LoadJobConfig(
+            write_disposition=write_disposition,
+            autodetect=autodetect_schema,
+        )
+
+    job = client.load_table_from_dataframe(df, table_id, job_config=load_config)
+    try:
+        job.result()
+    except BadRequest as e:
+        print(f"❌ BigQuery load failed: {e}")
+        for err in getattr(job, "errors", []) or []:
+            print(f" - {err.get('message')}")
+        raise
+
+    print(f"✅ Saved {len(df):,} row(s) to {table_id} "
+          f"({'APPEND after delete-by-key' if has_game_id else load_config.write_disposition})")
 
 def load_data(FileName: str, mode: str ) -> pd.DataFrame:
     """
@@ -50,38 +147,12 @@ def load_data(FileName: str, mode: str ) -> pd.DataFrame:
             print(f"❌ Could not load existing data from BigQuery: {e}")
             return pd.DataFrame()
 
-def save_database(df, table_name: str, mode: str = "bq"):
-    """
-    Save a DataFrame either locally or to BigQuery, depending on mode.
-
-    Args:
-        df (pd.DataFrame): Data to save
-        table_name (str): Table or file name
-        mode (str): 'local' or 'bq' (default: 'bq')
-    """
-    if mode == "local":
-        path = f"databases/{table_name}.csv"
-        df.to_csv(path, index=False)
-        print(f"✅ Saved locally to: {path}")
-    elif mode == "bq":
-        client = bigquery.Client()
-        table_id = f"ml-nba-project.nba_dataset.{table_name}"
-        job = client.load_table_from_dataframe(
-            df,
-            table_id,
-            job_config=bigquery.LoadJobConfig(write_disposition="WRITE_TRUNCATE")
-        )
-        job.result()
-        print(f"✅ Saved to BigQuery: {table_id}")
-    else:
-        raise ValueError("Invalid mode: choose 'local' or 'bq'")
-
 def _parse_gcs_uri(uri: str) -> tuple[str, str]:
     m = re.match(r"^gs://([^/]+)/(.+)$", uri)
     if not m:
         raise ValueError(f"Invalid GCS URI: {uri}")
     return m.group(1), m.group(2)
-    
+
 def load_model_artifact(model_path: str, mode: str):
     """
     Load a model artifact from either local disk or GCS.

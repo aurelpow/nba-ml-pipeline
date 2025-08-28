@@ -7,7 +7,7 @@ from nba_api.stats.endpoints import boxscoreadvancedv3
 from nba_api.stats.library.parameters import LeagueID
 from common.io_utils import  (save_database, load_data,
                             AdvancedBoxscoreFileName)
-from common.utils import  nba_api_timeout
+from common.constants import  nba_api_timeout
 from common.singleton_meta import SingletonMeta
 
 
@@ -213,5 +213,9 @@ class AdvancedBoxscoreGames(metaclass=SingletonMeta):
         # Get the boxscore data for new game IDs only
         advanced_boxscore_df: pd.DataFrame = self.get_boxscore_data(schedule_df_current_season)        
 
-        # Save the combined DataFrame locally
-        save_database(advanced_boxscore_df, AdvancedBoxscoreFileName, mode= self.SAVE_MODE)    
+        # Save the combined DataFrame locally or to BigQuery
+        save_database( df=advanced_boxscore_df,
+                       table_name=AdvancedBoxscoreFileName,
+                        mode= self.SAVE_MODE, 
+                        write_disposition="WRITE_APPEND",
+                        autodetect_schema=True)    

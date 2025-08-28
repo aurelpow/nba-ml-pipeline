@@ -9,6 +9,7 @@ from common.io_utils import (BoxscoreFileName, AdvancedBoxscoreFileName,
                           PlayersFileName, FutureGamesFileName,
                           PredictionsFileName, save_database,
                           load_model_artifact)
+from common.utils import extract_season, parse_minutes
 
 class PredictionsStatsPoints(metaclass = SingletonMeta):
     """
@@ -81,7 +82,7 @@ class PredictionsStatsPoints(metaclass = SingletonMeta):
 
         # Get the unique player IDs from the future games DataFrame
         players_unique = players_df[['PERSON_ID','PLAYER_SLUG', 'TEAM_ID', 'POSITION']].drop_duplicates()
-        print(f"Number of unique players: {len(players_unique)}")
+
         # Filter the players DataFrame to include only players who are playing 
         futures_game_df: pd.DataFrame = pd.concat([
             futures_game_df.merge(players_unique, left_on='HOME_TEAM_ID', right_on='TEAM_ID'),
@@ -102,6 +103,7 @@ class PredictionsStatsPoints(metaclass = SingletonMeta):
                                                                             else x 
                                                                             )
         
+
         # Add categorical features like is_home and season 
         futures_game_df['is_home']= futures_game_df['TEAM_ID'] == futures_game_df['HOME_TEAM_ID']
         futures_game_df['season'] = futures_game_df['GAME_ID'].astype(str).str[1:3].astype(int) + 2000
@@ -127,6 +129,14 @@ class PredictionsStatsPoints(metaclass = SingletonMeta):
         advanced_boxscore_df: pd.DataFrame = df_map["advanced_boxscore"]
         players_df: pd.DataFrame = df_map["players"]
 
+        # From the boxscore remove rows with DNP or no minutes played
+        boxscore_df: pd.DataFrame = boxscore_df[boxscore_df['comment'].isna() | 
+                                                        boxscore_df['minutes'].notna()] 
+        
+        # From the Advanced boxscore remove rows with DNP or no minutes played
+        advanced_boxscore_df: pd.DataFrame = advanced_boxscore_df[advanced_boxscore_df['comment'].isna() | 
+                                                        advanced_boxscore_df['minutes'].notna()] 
+        
         # Merge player metadata (keep only relevant columns)
         full_df = boxscore_df.merge(
             players_df[['PERSON_ID', 'HEIGHT', 'WEIGHT', 'POSITION']],
@@ -158,8 +168,7 @@ class PredictionsStatsPoints(metaclass = SingletonMeta):
         #  Create a copy of the DataFrame for processing
         df_to_process = historical_stats_df.copy()
         
-        # Transform minnutes from string to float
-        df_to_process['minutes'] = df_to_process['minutes'].apply(lambda x: float(x.split(':')[0]) if pd.notnull(x) else 0)
+        df_to_process['minutes'] = df_to_process['minutes'].apply(parse_minutes)
         
         # fill NaN values in 'position' witch 'BENCH'
         df_to_process['position'] = df_to_process['position'].fillna('BENCH')
@@ -172,16 +181,13 @@ class PredictionsStatsPoints(metaclass = SingletonMeta):
             axis=1
         )
         
-        # Remove rows
-        df_to_process: pd.DataFrame = df_to_process[df_to_process['comment'].isna() | df_to_process['minutes'].notna()]  # Remove DNP rows
-        
         # Change column date type to datetime 
         df_to_process['game_date'] = pd.to_datetime(df_to_process['game_date'])
         
-        # Add a season column based on the game_id 
-        df_to_process['season'] = df_to_process['game_id'].astype(str).str[1:3].astype(int) + 2000
+        # Add a season column based on the game_id using the common function
+        df_to_process['season'] = df_to_process['game_id'].apply(extract_season)
         
-        # Feature engineering is_home and opponent columns 
+        # Feature engineering is_home and opponent columns
         df_to_process['is_home'] = df_to_process['teamId'] == df_to_process['home_team_id']
         df_to_process['opponent'] = np.where(df_to_process['is_home'], df_to_process['visitor_team_id'], df_to_process['home_team_id'])
 
@@ -200,18 +206,17 @@ class PredictionsStatsPoints(metaclass = SingletonMeta):
 
         # Aggregate per (position_group, opponent)
         result = (
-            df_avg
-            .groupby(['position_group','opponent'])
-            .apply(lambda g: pd.Series({
-                'avg_pts_opp_position_last_10': g['avg_points'].tail(10).mean(),
-                'avg_pts_opp_position_last_20': g['avg_points'].tail(20).mean(),
-                'avg_pts_opp_position_all'   : g['avg_points'].mean()
-            }))
+            df_avg.groupby(['position_group', 'opponent'])
+            .agg(
+                avg_pts_opp_position_last_10=('avg_points', lambda x: x.tail(10).mean()),
+                avg_pts_opp_position_last_20=('avg_points', lambda x: x.tail(20).mean()),
+                avg_pts_opp_position_all=('avg_points', 'mean')
+            )
             .reset_index()
         )
 
         # Put these stats back on final_df 
-        final_df = (
+        final_df: pd.DataFrame = (
             df_to_process
             .merge(result[['position_group','opponent','avg_pts_opp_position_last_10','avg_pts_opp_position_last_20','avg_pts_opp_position_all']],
                 on=['position_group','opponent'],
@@ -258,7 +263,7 @@ class PredictionsStatsPoints(metaclass = SingletonMeta):
         return df    
 
     @staticmethod
-    def encode_categorical_data(df: pd.DataFrame) -> pd.DataFrame:
+    def encode_categorical_data(df: pd.DataFrame) -> tuple[pd.DataFrame, list]:
         """
         Encode categorical features in the DataFrame. 
         Args:
@@ -270,17 +275,24 @@ class PredictionsStatsPoints(metaclass = SingletonMeta):
         categorical_feats = ['is_home', 'season']
 
         # Encode categorical features using one-hot encoding
+            # prepare the encoder
         encoder = OneHotEncoder(sparse_output=False, handle_unknown='ignore')
+            # fit and transform the data
         encoded_categorical = encoder.fit_transform(df[categorical_feats])
 
-        
-        # put the encoded categorical features back into the DataFrame
+        # Get the new feature names after encoding
+        encoded_feature_names = encoder.get_feature_names_out(categorical_feats)
+
+        # remove original categorical features from the DataFrame
         df = df.drop(categorical_feats, axis=1)
+
+        # put the encoded categorical features back into the DataFrame
         df = pd.concat([df, pd.DataFrame(encoded_categorical, columns=encoder.get_feature_names_out(categorical_feats))], axis=1)
 
-        return df    
+        return df, encoded_feature_names
     
-    def prepare_future_games_data(self,future_games_players_df : pd.DataFrame, normalized_data: pd.DataFrame ) -> pd.DataFrame:
+    def prepare_future_games_data(self,future_games_players_df : pd.DataFrame, encoded_data: pd.DataFrame, 
+                                   feature_encoded_names)-> tuple[pd.DataFrame, pd.DataFrame]:
         """
         Prepare the future games data for predictions.
         Args:
@@ -288,45 +300,10 @@ class PredictionsStatsPoints(metaclass = SingletonMeta):
         Returns:
             pd.DataFrame: A DataFrame with future games data ready for predictions.
         """
-        
-        future_games_players_df = self.encode_categorical_data(future_games_players_df)
-        # Add average points per opponent position group 
-            # 1. Filter out bench players
-        df = normalized_data[normalized_data['position'] != 'BENCH']
-            # 2. Compute one avg_points per group/opponent/game_date
-        df_avg = (
-            df
-            .groupby(['position_group','opponent','game_date'])['points']
-            .mean()
-            .reset_index(name='avg_points')
-        )
 
-            # 3. sort so tail() really pulls the last N by date
-        df_avg = df_avg.sort_values(['position_group','opponent','game_date'])
-
-            # 4. aggregate per (position_group, opponent)
-        result = (
-            df_avg
-            .groupby(['position_group','opponent'])
-            .apply(lambda g: pd.Series({
-                'avg_pts_opp_position_last_10': g['avg_points'].tail(10).mean(),
-                'avg_pts_opp_position_last_20': g['avg_points'].tail(20).mean(),
-                'avg_pts_opp_position_all'   : g['avg_points'].mean()
-            }))
-            .reset_index()
-        )
-
-        # 5. Put these stats back on final_df 
-        final_df = (
-            future_games_players_df
-            .merge(result[['position_group','opponent','avg_pts_opp_position_last_10','avg_pts_opp_position_last_20','avg_pts_opp_position_all']],
-                on=['position_group','opponent'],
-                how='left')
-        )
-
-        # 2. Get the latest stats for each player from final_df
+        # Get the latest stats for each player from final_df
         latest_stats = (
-            normalized_data.sort_values('game_date')
+            encoded_data.sort_values('game_date')
             .groupby('personId')
             .tail(1)
             .set_index('personId')
@@ -353,13 +330,13 @@ class PredictionsStatsPoints(metaclass = SingletonMeta):
             'avg_pts_opp_position_all_per_poss'
         ])
 
+        # Select only the necessary columns for prediction
+        numeric_feats.extend(feature_encoded_names)
 
         # 3. Merge stats into future_games_long
-        future_games_long = final_df.join(latest_stats[numeric_feats], on='PERSON_ID')
-        
-        # Select only the necessary columns for prediction
-        numeric_feats.extend(['is_home_False', 'is_home_True', 'season_2024'])
-    
+        future_games_long = future_games_players_df.join(latest_stats[numeric_feats], on='PERSON_ID')
+
+        # Fill NaN values with 0 for prediction    
         X_pred = future_games_long[numeric_feats].fillna(0)
 
         return future_games_long ,X_pred
@@ -416,10 +393,14 @@ class PredictionsStatsPoints(metaclass = SingletonMeta):
 
         # Normalize numerical data
         normalized_data: pd.DataFrame = self.normalize_numerical_data(historical_data_model)
+        
+        # Encode categorical features and prepare the final dataframe for predictions
+        encoded_dataframe, feature_encoded_names = self.encode_categorical_data(normalized_data)
 
         # Prepared dataframe 
-        future_games_long_df, X_pred_df = self.prepare_future_games_data(future_games_players, normalized_data)
-
+        future_games_long_df, X_pred_df = self.prepare_future_games_data(future_games_players,
+                                                                          encoded_dataframe, feature_encoded_names)
+        
         return future_games_long_df, X_pred_df
     
     def run(self) -> pd.DataFrame:
@@ -442,6 +423,8 @@ class PredictionsStatsPoints(metaclass = SingletonMeta):
         predictions_df = self.get_predictions(future_games_long_df, X_pred_df, model)
 
         # Save the predictions to a CSV file
-        save_database(predictions_df,PredictionsFileName, mode=self.SAVE_MODE)
+        save_database(predictions_df,PredictionsFileName, 
+                      mode=self.SAVE_MODE,
+                      write_disposition="WRITE_APPEND")
         
         return predictions_df

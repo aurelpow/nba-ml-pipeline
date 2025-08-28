@@ -8,7 +8,7 @@ from nba_api.stats.endpoints import leaguegamefinder
 from nba_api.stats.library.parameters import LeagueID
 from common.singleton_meta import SingletonMeta
 from common.io_utils import FutureGamesFileName, save_database
-from common.utils import  nba_api_timeout
+from common.constants import  nba_api_timeout
 
 class NbaGamesLog(metaclass=SingletonMeta):
     """
