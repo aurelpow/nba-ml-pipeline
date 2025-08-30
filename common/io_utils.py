@@ -27,15 +27,6 @@ DATASET_ID = "nba_dataset"
 def _table_ref(table_name: str) -> str:
     return f"{PROJECT_ID}.{DATASET_ID}.{table_name}"
 
-def _normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Normalize dataframe columns to match BigQuery naming rules.
-    - lowercase all column names
-    """
-    df: pd.DataFrame = df.copy()
-    df.columns = [col.lower() for col in df.columns]
-    return df
-
 def _delete_rows_by_game_id(client: bigquery.Client, table_id: str, game_ids: Iterable) -> int:
     game_ids = list({str(gid) for gid in game_ids if pd.notna(gid)})
     if not game_ids:
@@ -43,7 +34,7 @@ def _delete_rows_by_game_id(client: bigquery.Client, table_id: str, game_ids: It
 
     query = f"""
     DELETE FROM `{table_id}`
-    WHERE GAME_ID IN UNNEST(@game_ids)
+    WHERE gameId IN UNNEST(@game_ids)
     """
     job = client.query(
         query,
@@ -65,17 +56,15 @@ def save_database(
 ) -> None:
     """
     Save a DataFrame either locally or to BigQuery.
-    - If df has GAME_ID column: delete matching rows before append
+    - If df has gameId column: delete matching rows before append
     - Else: overwrite table (default WRITE_TRUNCATE)
     """
     if df is None or df.empty:
         print("⚠️ DataFrame empty; nothing to save.")
         return
 
-    # Normalize columns before any processing
-    df = _normalize_columns(df)
     # Add aud_modification_date column (datetime)
-    df["aud_modification_date"] = pd.Timestamp.now(tz="UTC+2")
+    df["aud_modification_date"] = pd.Timestamp.now(tz="Europe/Madrid")
 
     if mode == "local":
         path = f"databases/{table_name}.csv"
@@ -89,12 +78,12 @@ def save_database(
     client = bigquery.Client()
     table_id = _table_ref(table_name)
 
-    has_game_id = "game_id" in df.columns
+    has_game_id = "gameId" in df.columns
 
     if has_game_id:
-        unique_ids = df["GAME_ID"].astype(str).dropna().unique().tolist()
+        unique_ids = df["gameId"].astype(str).dropna().unique().tolist()
         deleted = _delete_rows_by_game_id(client, table_id, unique_ids)
-        print(f"🧹 Deleted {deleted} rows in {table_id} for {len(unique_ids)} GAME_ID(s).")
+        print(f"🧹 Deleted {deleted} rows in {table_id} for {len(unique_ids)} gameId(s).")
 
         load_config = bigquery.LoadJobConfig(
             write_disposition="WRITE_APPEND",

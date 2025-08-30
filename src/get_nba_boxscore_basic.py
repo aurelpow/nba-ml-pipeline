@@ -189,14 +189,54 @@ class BoxscoreGames(metaclass=SingletonMeta):
             how="left",
         )
         
+        # Only select relevant columns 
+        final_columns: list = [
+            "gameId",
+            "teamId",
+            "teamTricode",
+            "personId",
+            "playerSlug",
+            "position",
+            "minutes",
+            "fieldGoalsMade",
+            "fieldGoalsAttempted",
+            "fieldGoalsPercentage",
+            "threePointersMade",
+            "threePointersAttempted",
+            "threePointersPercentage",
+            "freeThrowsMade",
+            "freeThrowsAttempted",
+            "freeThrowsPercentage",
+            "reboundsOffensive",
+            "reboundsDefensive",
+            "reboundsTotal",
+            "assists",
+            "steals",
+            "blocks",
+            "turnovers",
+            "foulsPersonal",
+            "points",
+            "is_regular_season",
+            "is_playoffs",
+            "playoffs_desc",
+            "game_date",
+            "home_team_id",
+            "visitor_team_id",
+            "game_status_text"
+        ]
+
         # Combine with existing data if any
         final_df: pd.DataFrame = (
             pd.concat([existing_df, new_boxscores_df], ignore_index=True)
             if not existing_df.empty
             else new_boxscores_df
         )
-
-        return final_df
+        
+        # return final dataframe or new datafdrame 
+        if self.SAVE_MODE == 'local':
+            return final_df[final_columns]
+        else:
+            return new_boxscores_df[final_columns]
     
     def run(self):
         """
@@ -207,6 +247,11 @@ class BoxscoreGames(metaclass=SingletonMeta):
         
         # Get the boxscore data (new + existing)
         boxscore_df = self.get_boxscore_data(schedule_df_current_season)
-        
+        print(boxscore_df.count())
         # Save the combined boxscore data
-        save_database(boxscore_df, BoxscoreFileName, mode=self.SAVE_MODE)
+        save_database(df=boxscore_df, 
+                      table_name=BoxscoreFileName, 
+                      mode=self.SAVE_MODE, 
+                      write_disposition="WRITE_APPEND",
+                      autodetect_schema=True
+                      )

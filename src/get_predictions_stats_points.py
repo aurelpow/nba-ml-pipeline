@@ -130,12 +130,12 @@ class PredictionsStatsPoints(metaclass = SingletonMeta):
         players_df: pd.DataFrame = df_map["players"]
 
         # From the boxscore remove rows with DNP or no minutes played
-        boxscore_df: pd.DataFrame = boxscore_df[boxscore_df['comment'].isna() | 
-                                                        boxscore_df['minutes'].notna()] 
+        boxscore_df: pd.DataFrame = boxscore_df[(boxscore_df['minutes'] == "0:00") | 
+                                                        (boxscore_df['minutes'].notna())] 
         
         # From the Advanced boxscore remove rows with DNP or no minutes played
-        advanced_boxscore_df: pd.DataFrame = advanced_boxscore_df[advanced_boxscore_df['comment'].isna() | 
-                                                        advanced_boxscore_df['minutes'].notna()] 
+        advanced_boxscore_df: pd.DataFrame = advanced_boxscore_df[(boxscore_df['minutes'] == "0:00") | 
+                                                        (advanced_boxscore_df['minutes'].notna())] 
         
         # Merge player metadata (keep only relevant columns)
         full_df = boxscore_df.merge(
@@ -358,17 +358,17 @@ class PredictionsStatsPoints(metaclass = SingletonMeta):
         predictions = model.predict(X_pred)
         # Create a DataFrame with predictions
         predictions_df = pd.DataFrame({
-            'GAME_ID': future_games_df['GAME_ID'],
-            'GAME_DATE': future_games_df['game_date'],
-            'TEAM_ID': future_games_df['TEAM_ID'],
-            'OPPONENT': future_games_df['opponent'],
-            'PERSON_ID': future_games_df['PERSON_ID'],
-            'FULL_NAME' : future_games_df['PLAYER_SLUG'],
-            'PREDICTED_POINTS': predictions
+            'game_id': future_games_df['GAME_ID'],
+            'game_date': future_games_df['game_date'],
+            'team_id': future_games_df['TEAM_ID'],
+            'opponent_id': future_games_df['opponent'],
+            'person_id': future_games_df['PERSON_ID'],
+            'full_name' : future_games_df['PLAYER_SLUG'],
+            'predicted_points': predictions
             })
         
         # Sort the DataFrame by predicted points (DESC) 
-        predictions_df = predictions_df.sort_values(by= 'PREDICTED_POINTS', ascending=False)
+        predictions_df = predictions_df.sort_values(by= 'predicted_points', ascending=False)
         
         return predictions_df
 

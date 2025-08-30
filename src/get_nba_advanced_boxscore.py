@@ -193,6 +193,46 @@ class AdvancedBoxscoreGames(metaclass=SingletonMeta):
             how="left",
         )
         
+        # Only select relevant columns 
+        final_columns: list = [
+            "gameId",
+            "teamId",
+            "teamTricode",
+            "personId",
+            "playerSlug",
+            "position",
+            "minutes",
+            "estimatedOffensiveRating",
+            "offensiveRating",
+            "estimatedDefensiveRating",
+            "defensiveRating",
+            "estimatedNetRating",
+            "netRating",
+            "assistPercentage",
+            "assistToTurnover",
+            "assistRatio",
+            "offensiveReboundPercentage",
+            "defensiveReboundPercentage",
+            "reboundPercentage",
+            "turnoverRatio",
+            "effectiveFieldGoalPercentage",
+            "trueShootingPercentage",
+            "usagePercentage",
+            "estimatedUsagePercentage",
+            "estimatedPace",
+            "pace",
+            "pacePer40",
+            "possessions",
+            "PIE",
+            "is_regular_season",
+            "is_playoffs",
+            "playoffs_desc",
+            "game_date",
+            "home_team_id",
+            "visitor_team_id",
+            "game_status_text"
+            ]
+
         # Combine with existing data if any
         final_df: pd.DataFrame = (
             pd.concat([existing_df, new_boxscores_df], ignore_index=True)
@@ -200,9 +240,12 @@ class AdvancedBoxscoreGames(metaclass=SingletonMeta):
             else new_boxscores_df
         )
 
-        return final_df
+        # return final dataframe or new datafdrame 
+        if self.SAVE_MODE == 'local':
+            return final_df[final_columns]
+        else:
+            return new_boxscores_df[final_columns]
       
-        
     def run(self):
         """
         Run the BoxscoreGames process.
@@ -212,10 +255,11 @@ class AdvancedBoxscoreGames(metaclass=SingletonMeta):
         
         # Get the boxscore data for new game IDs only
         advanced_boxscore_df: pd.DataFrame = self.get_boxscore_data(schedule_df_current_season)        
-
+        print(advanced_boxscore_df.count())
         # Save the combined DataFrame locally or to BigQuery
         save_database( df=advanced_boxscore_df,
                        table_name=AdvancedBoxscoreFileName,
                         mode= self.SAVE_MODE, 
                         write_disposition="WRITE_APPEND",
-                        autodetect_schema=True)    
+                        autodetect_schema=True
+                        )    

@@ -39,6 +39,31 @@ class NbaPlayersData(metaclass=SingletonMeta):
                                                                 timeout= nba_api_timeout
                                                                 ).get_data_frames()[0]
 
+        # Select relevant columns 
+        playerindex_df = playerindex_df[
+            ["PERSON_ID",
+             "PLAYER_LAST_NAME",
+             "PLAYER_FIRST_NAME",
+             "PLAYER_SLUG",
+             "TEAM_ID",
+             "TEAM_ABBREVIATION",
+             "JERSEY_NUMBER",
+             "POSITION",
+             "HEIGHT",
+             "WEIGHT",
+             "COLLEGE",
+             "COUNTRY",
+             "DRAFT_YEAR",
+             "DRAFT_ROUND",
+             "DRAFT_NUMBER",
+             "ROSTER_STATUS",
+             "FROM_YEAR",
+             "TO_YEAR"
+            ]]
+        
+        # Lower case column names 
+        playerindex_df.columns = [col.lower() for col in playerindex_df.columns]
+                
         return playerindex_df
 
     def run(self) -> None:
