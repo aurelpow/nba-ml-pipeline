@@ -19,8 +19,15 @@ class NbaPlayersData(metaclass=SingletonMeta):
 
     def __init__(self, current_season: str, save_mode: str,
                     proxy_user: str = None, proxy_pass: str = None) -> None:
-        self.current_season: str = current_season  # e.g., "2024-25"
-        self.file_name: str = f"{PlayersFileName}_{current_season}"
+        """
+        Initialize the NBA players data for a given season
+            Args:
+                current_season (str) : The season to fetch players for, e.g., "2024-25" 
+                save_mode (str): Where to save the output ('bq' or 'local')
+                proxy_user (str, optional): Proxy username if needed. Defaults to None.
+                proxy_user (str, optional): Proxy password if needed. Defaults to None.
+        """
+        self.current_season: str = current_season  # e.g., "2024-25""
         self.SAVE_MODE: str = save_mode
         # Build proxy string only if not running locally
         if self.SAVE_MODE != "local" and proxy_user and proxy_pass:
@@ -71,7 +78,7 @@ class NbaPlayersData(metaclass=SingletonMeta):
         try:
             df = self.get_nba_players_index()
             if df is not None and not df.empty:
-                save_database(df, self.file_name, mode=self.SAVE_MODE)
+                save_database(df, PlayersFileName, mode=self.SAVE_MODE)
                 print(f"✅ Players data saved with mode: {self.SAVE_MODE} (rows={len(df)})")
             else:
                 print("⚠️ No players data fetched. Process skipped.")

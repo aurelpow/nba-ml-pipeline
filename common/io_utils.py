@@ -18,6 +18,7 @@ PlayersFileName: str = "nba_players_df"
 TeamsFileName: str = "nba_teams_df"
 FutureGamesFileName: str = "nba_future_games_df"
 PredictionsFileName: str = 'nba_points_predictions_df'
+ScheduleFileName: str = 'nba_schedule_df' 
 
 # Define the path to the databases folder.
 databases_path: str = "databases/"
@@ -27,9 +28,22 @@ DATASET_ID = "nba_dataset"
 def _table_ref(table_name: str) -> str:
     return f"{PROJECT_ID}.{DATASET_ID}.{table_name}"
 
+from google.cloud import bigquery
+from google.api_core.exceptions import NotFound
+import pandas as pd
+from typing import Iterable
+
 def _delete_rows_by_game_id(client: bigquery.Client, table_id: str, game_ids: Iterable) -> int:
     game_ids = list({str(gid) for gid in game_ids if pd.notna(gid)})
     if not game_ids:
+        return 0
+
+    # ✅ Check if table exists
+    try:
+        client.get_table(table_id)
+    except NotFound:
+        # Table doesn't exist, return 0
+        print(f"Table {table_id} not found, skipping deletion")
         return 0
 
     query = f"""
@@ -46,6 +60,7 @@ def _delete_rows_by_game_id(client: bigquery.Client, table_id: str, game_ids: It
     )
     job.result()
     return getattr(job, "num_dml_affected_rows", 0) or 0
+
 
 def save_database(
     df: pd.DataFrame,
@@ -80,7 +95,7 @@ def save_database(
 
     has_game_id = "gameId" in df.columns
 
-    if has_game_id:
+    if has_game_id and write_disposition == "WRITE_APPEND":
         unique_ids = df["gameId"].astype(str).dropna().unique().tolist()
         deleted = _delete_rows_by_game_id(client, table_id, unique_ids)
         print(f"🧹 Deleted {deleted} rows in {table_id} for {len(unique_ids)} gameId(s).")

@@ -144,13 +144,17 @@ class AdvancedBoxscoreGames(metaclass=SingletonMeta):
         # Load existing data if available
         existing_df: pd.DataFrame = load_data(AdvancedBoxscoreFileName, mode=self.SAVE_MODE)
 
-        if not existing_df.empty and "gameId" in existing_df.columns: # only if existing data has gameId col
+        # Determine already processed game IDs
+        if existing_df is None: # Case when there is no file yet (first run)
+            processed_game_ids: set = set()
+        elif not existing_df.empty and "gameId" in existing_df.columns: # only if existing data has gameId col
             if self.SAVE_MODE == "bq": # In BQ gameID is stored as string (so we already have 00 prefix)
-                 processed_game_ids: set = set(existing_df["gameId"].astype(str).unique())
+                processed_game_ids: set = set(existing_df["gameId"].astype(str).unique())
             else: # In local CSV gameID is stored as int (no leading zeros)
                 processed_game_ids: set = {f"00{gid}" for gid in existing_df["gameId"].astype(int).unique()}
-            # Convert game IDs to string format with leading zeros
-        else: # Empty existing data 
+        elif existing_df.empty:  # Case when there is no existing data 
+            processed_game_ids: set = set()
+        else: # Case when existing data has no gameId col (should not happen)
             processed_game_ids: set = set()
         
         # Filter schedule to only ended games (status "3"
@@ -233,12 +237,15 @@ class AdvancedBoxscoreGames(metaclass=SingletonMeta):
             "game_status_text"
             ]
 
-        # Combine with existing data if any
-        final_df: pd.DataFrame = (
-            pd.concat([existing_df, new_boxscores_df], ignore_index=True)
-            if not existing_df.empty
-            else new_boxscores_df
-        )
+        # Combine with existing data if not none or empty 
+        if existing_df is None:
+            final_df: pd.DataFrame = new_boxscores_df
+        elif existing_df.empty:
+            final_df: pd.DataFrame = new_boxscores_df
+        else: # existing data is not empty
+            final_df: pd.DataFrame = (
+                pd.concat([existing_df, new_boxscores_df], ignore_index=True)
+                )
 
         # return final dataframe or new datafdrame 
         if self.SAVE_MODE == 'local':
@@ -255,7 +262,7 @@ class AdvancedBoxscoreGames(metaclass=SingletonMeta):
         
         # Get the boxscore data for new game IDs only
         advanced_boxscore_df: pd.DataFrame = self.get_boxscore_data(schedule_df_current_season)        
-        print(advanced_boxscore_df.count())
+
         # Save the combined DataFrame locally or to BigQuery
         save_database( df=advanced_boxscore_df,
                        table_name=AdvancedBoxscoreFileName,

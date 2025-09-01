@@ -7,7 +7,7 @@ credentials_encrypted.json
 #  - This notebook is used to test the code and the models
 #  - It is not meant to be committed to the repository
 ml_dev/notebooks/testingNotebook.ipynb
-mldev/notebooks/InferenceModelFutureGames.ipynb
+ml_dev/notebooks/InferenceModelFutureGames.ipynb
 # img and models folder from ml_dev 
 ml_dev/img/
 ml_dev/models/
