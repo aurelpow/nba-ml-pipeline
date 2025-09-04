@@ -1,1 +1,0 @@
-sheet_url = "https://docs.google.com/spreadsheets/d/1RMSZD8Xjy08364mJQeMw90jPvyZmhgLPjqJ_9auFPLY/"

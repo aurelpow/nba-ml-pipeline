@@ -1,36 +1,69 @@
-# NBA Project ML
+# NBA Player Predictions - End to End Pipeline (Docker +Google Cloud )
 
-A complete, modular pipeline for fetching, processing, modeling, and predicting NBA player performance. Whether you’re exploring the data in a notebook or running daily inference in production, this repo has you covered.
+*A complete, modular pipeline for fetching, processing, modeling, and predicting NBA player performance. 
+Whether you’re exploring the data in a notebook or running daily inference in production, this repo has you covered.*
+
+I built this because I love **basketball + data🏀📈**. 
 
 ---
 
-## 🚀 Key Components
+## 📥 Data Sources and Ingestion
+[swar/nba_api](https://github.com/swar/nba_api/)
 
-1. **Data Ingestion**
-
-   - **Players & Teams**: Retrieve active rosters and team metadata via the NBA Stats API. ([swar/nba_api](https://github.com/swar/nba_api.git))
+   - **Players**: Retrieve active rosters via the NBA Stats API
+      - Source : [swar/nba_api/stats/endpoints/playerindex](https://github.com/swar/nba_api/blob/master/src/nba_api/stats/endpoints/playerindex.py)
+      - Ingestion : [src/get_nba_players](src/get_nba_players.py)
+   - **Teams**: Retrieve team metadata via the NBA Stats API.
+      - Source : [swar/nba_api/stats/static/teams](https://github.com/swar/nba_api/blob/master/src/nba_api/stats/static/teams.py)
+      - Ingestion : [src/get_nba_teams](src/get_nba_teams.py)
    - **Boxscores**: Pull both basic and advanced boxscore statistics for every game.
-   - **Schedule**: Fetch upcoming game schedules (but by default only process completed games).
+      - **Basic Boxscore**: 
+         - Source : [swar/nba_api/stats/endpoints/boxscoretraditionalv3](https://github.com/swar/nba_api/blob/master/src/nba_api/stats/endpoints/boxscoretraditionalv3.py)
+         - Ingestion : [src/get_nba_boxscore_basic](src/get_nba_boxscore_basic.py) 
+      - **Advanced Boxscore**
+         - Source : [swar/nba_api/stats/endpoints/boxscoreadvancedv3](https://github.com/swar/nba_api/blob/master/src/nba_api/stats/endpoints/boxscoreadvancedv3.py)
+         - Ingestion : [src/get_nba_advanced_boxscore](src/get_nba_advanced_boxscore.py) 
+   - **Schedule**: Fetch all game schedules for a specific season.
+      - Source [swar/nba_api/stats/endpoints/scheduleleaguev2](https://github.com/swar/nba_api/blob/master/src/nba_api/stats/endpoints/scheduleleaguev2.py)
+      - Ingestion : [src/get_nba_schedule.py](src/get_nba_schedule.py)
 
-2. **Feature Engineering**
+> 🔐 NBA API calls can use a private proxy ([DecoDO](https://dashboard.decodo.com/welcome)) via `HTTP_PROXY` / `HTTPS_PROXY`. — avoids timeouts  
+> In Cloud Run, mount these from **Secret Manager**.
 
-   - **Rolling Statistics**: Compute configurable rolling-window averages (e.g. last 5, 10, 15 games) for pace, usage, shooting rates, etc.
-   - **Matchup Averages**: Calculate per-opponent and per-position matchup performance (full history + recent windows).
-   - **Normalization**: Derive per-36-minute and per-possession rates.
-   - **Scaling**: Standardize features via `StandardScaler` for model input.
+## 🧠 Machine Learning Model
 
-3. **Model Training & Evaluation**
-
-   - **Notebook Workflow**: Explore data, engineer features, train LightGBM models, and evaluate via cross-validation in the Jupyter notebook [NBA\_Players\_Points\_Prediction\_ML.ipynb](ml_dev/notebooks/NBA_Players_Points_Prediction_ML.ipynb).
-   - **Hyperparameter Tuning**: Grid-search rolling window sizes and `LightGBM` parameters to optimize RMSE.
-
-4. **Inference & Deployment**
-
-   - **Persistence**: Save the trained `best_lgbm_model.pkl` artifact.
-   - **Dockerized Pipeline**: Single-entry `run_all.sh` script runs the full ETL + prediction workflow daily.
-   - **Scheduling**: Easily schedule via cron or CI (GitHub Actions, Jenkins, etc.) to generate fresh `nba_boxscore_predictions.csv`.
+- **Notebook**:  [NBA_Players_Points_Prediction_ML](ml_dev/notebooks/NBA_Players_Points_Prediction_ML.ipynb)
+  - Data exploration & cleaning
+  - Feature engineering (touches, shooting splits, contested/uncontested, defended-at-rim, opponent/position effects, rolling windows)
+  - Model selection: **LightGBM** for Points (PTS)
+  - Evaluation & tuning (metrics + plots)
+  - Export artifact: `best_lgbm_model.pkl`
+### 🧭 How to Train & Export
+1. Open the notebook `ml_dev/notebooks/NBA_Players_Points_Prediction_ML.ipynb`
+2. Run training cells → evaluate → persist the **best** model:
+   - Local:
+     ```python
+     joblib.dump(model, "ml_dev/models/best_lgbm_model.pkl")
+     ```
+   - GCS: Copy and paste the model to a google cloud bucket
 
 ---
+## 🧰 Data Prep & Inference
+**Goal**: prepare the inputs to the exact feature schema the trained model expects, then generate player-game predictions.
+Core utilities live in `common/`:
+- `parser.py`, `utils.py`, `io_utils.py`, `constants.py`
+- Tasks: schema normalization, joins (players/teams ↔ boxscores), type casting, dedup, and quality checks.
+
+### Inference ([src/get_predictions_stats_points.py](src/get_predictions_stats_points.py))
+1) **Load schedule** for `DATE … DATE + DAYS_NUMBER` (`get_nba_schedule.py`).
+2) Expand to **player-game** rows for active rosters.
+3) **Load model** from `MODEL_PATH` (local path or `gs://…`):
+   the loader downloads from GCS at runtime if needed.
+4) Build the **same feature set** used at train time for each player-game.
+5) **Predict** points (PTS). Optionally compute fantasy/scoring aggregates.
+6) **Persist (by `SAVE_MODE`)**
+   - `local` → `predictions_${DATE}.csv`
+   - `bq`    → BigQuery table (configured in `io_utils.py` / `constants.py`)
 
 ## 📁 Repository Structure
 
@@ -45,10 +78,13 @@ NBA_project_ML/
 │   ├── get_nba_teams.py
 │   ├── get_nba_boxscore_basic.py
 │   ├── get_nba_advanced_boxscore.py
-│   ├── get_future_games.py
+│   ├── get_nba_schedule.py
 │   └── get_predictions_stats_points.py
 ├── common/               # Shared utilities, parsers, and singletons
+│   ├── common.py
+│   ├── io_utils.py
 │   ├── parser.py
+│   ├── singleton_meta.py
 │   └── utils.py
 ├── ml_dev/
 │   ├── notebooks/        # Jupyter notebooks for EDA & model development
@@ -66,8 +102,21 @@ NBA_project_ML/
 ```
 
 ---
+## ⚙️ Configuration (env vars)
 
-## ⚙️ Installation & Setup
+| Var | Required | Example | Notes |
+|---|---|---|---|
+| `SEASON` | ✅ | `2024-25` | Target season |
+| `SEASON_TYPE` | ❕ | `Regular Season` | Default: Regular Season |
+| `DATE` | ✅ | `2025-05-01` | Start date for inference |
+| `DAYS_NUMBER` | ❕ | `1` | Days ahead |
+| `SAVE_MODE` | ❕ | `local` \| `bq` | CSV vs BigQuery |
+| `MODEL_PATH` | ❕ | `ml_dev/models/best_lgbm_model.pkl` \| `gs://…/best_lgbm_model.pkl` | Local or GCS |
+| `HTTP_PROXY` / `HTTPS_PROXY` | ❕ | secret | Use in cloud to avoid API timeouts |
+
+> If `MODEL_PATH` starts with `gs://`, the app downloads the file at runtime (see `common/io_utils.py::load_model()`).
+
+## ⚙️  Setup
 
 1. **Clone the repository**
 
@@ -94,120 +143,66 @@ NBA_project_ML/
 
 ## 🔄 Running the Pipeline
 
-### All-in-One (preferred)
+### A) Local (CSV)
+To run a specific process 
+```bash
+python -u main.py -p get_predictions_stats_points -s 2024-25 -d "2025-04-13" -m "ml_dev/models/best_lgbm_model.pkl" -sm "local"
+# -> ./databases/nba_points_predictions_df.csv
+```
+>-p process, -s season, -d date, -m model path, -sm save mode.
 
-Run every process—players, teams, boxscores, and predictions—with one command:
-
+### B) Docker
 ```bash
 docker run --rm \
-  -v "${PWD}/databases:/app/databases" \
-  -e SEASON="2024-25" \
-  -e DATE="$(date +'%Y-%m-%d')" \
-  nba-pipeline:latest
+  -e SEASON="2024-25" -e SEASON_TYPE="Regular Season" \
+  -e DATE="2025-05-01" \
+  -e SAVE_MODE="local" \
+  -e MODEL_PATH="ml_dev/models/best_lgbm_model.pkl" \
+  nba_project_ml:latest
 ```
-
-### Individual Processes
-
-You can still target a single step via CLI args:
-
+### C) Cloud Run Job (BigQuery + proxy secret)
 ```bash
-# Example: only fetch basic boxscores
-docker run --rm \
-  -v "${PWD}/databases:/app/databases" \
-  nba-pipeline:latest \
-  -p get_nba_boxscore_basic -s 2024-25
+# build & push (see cloudbuild.yaml) or:
+PROJECT_ID="your-gcp-project"
+REGION="us-central1"
+ARTIFACT_REPO="nba-docker-repo"
+IMAGE_NAME="nba_project"
+IMAGE_URI="${REGION}-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REPO}/${IMAGE_NAME}:latest"
+
+BUCKET_MODELS="gs://your-bucket/models_trained"
+MODEL_PATH="${BUCKET_MODELS}/best_lgbm_model.pkl"
+
+# one-time proxy secret (DecoDO URL)
+# gcloud secrets create PROXY_URL --data-file=<(echo -n "http://user:pass@host:port")
+
+# Create or update the Cloud Run Job with env vars + secrets
+gcloud run jobs create nba-prediction-job \
+  --image "$IMAGE_URI" \
+  --region "$REGION" \
+  --set-env-vars=SEASON=2024-25,SEASON_TYPE="Regular Season",DATE=2025-05-01,DAYS_NUMBER=1,SAVE_MODE=bq,MODEL_PATH="${MODEL_PATH}" \
+  --set-secrets=HTTPS_PROXY=PROXY_URL:latest,HTTP_PROXY=PROXY_URL:latest \
+  --max-retries=1 --memory=1Gi --cpu=1 --task-timeout=1800s \
+|| gcloud run jobs update nba-prediction-job \
+  --image "$IMAGE_URI" \
+  --region "$REGION" \
+  --set-env-vars=SEASON=2024-25,SEASON_TYPE="Regular Season",DATE=2025-05-01,DAYS_NUMBER=1,SAVE_MODE=bq,MODEL_PATH="${MODEL_PATH}" \
+  --set-secrets=HTTPS_PROXY=PROXY_URL:latest,HTTP_PROXY=PROXY_URL:latest
+
+# Execute ad-hoc
+gcloud run jobs execute nba-prediction-job --region "$REGION"
 ```
+## 🗺️ Modes & Outputs
 
----
-
-## 📊 Model Insights & Metrics
-
-- **Cross-Validation RMSE**: \~**X.XX** points (5-fold CV on hold-out season).
-- **Top Features**:
-  1. `avg_points_vs_opponent_per36`
-  2. `avg_pts_opp_position_per_poss`
-  3. Recent `fieldGoalsMade_roll10_per36`
-
-Refer to the training notebook for full EDA, feature importance plots, and hyperparameter results.
-
----
+- Run: local 🖥️ / docker 🐳 / cloud ☁️
+- Save: SAVE_MODE=local → 📄 CSV | SAVE_MODE=bq → 🗄️ BigQuery
 
 ## 📄 License & Credits
 
 - **Author**: Aurelien Pow ([@aurelpow](https://github.com/aurelpow))
 
----
----
-
-## 🏗️ Model Training Process
-
-The training pipeline is fully coded in the Jupyter notebook **NBA\_Players\_Points\_Prediction\_ML.ipynb**, but here is a high-level overview:
-
-1. **Load and Clean Data**
-
-   - Merge basic and advanced boxscores with player & team metadata.
-   - Filter out DNPs and games with incomplete data.
-
-2. **Feature Engineering**
-
-   - Compute rolling-window features for each stat (e.g. last 5, 10, 15 games).
-   - Derive matchup-specific aggregates (`avg_points_vs_opponent`, `avg_pts_opp_position`) and their rolling variants.
-   - Normalize to per-36 minutes and per-possession rates.
-   - Standardize numeric features with `StandardScaler`.
-
-3. **Train-Test Split**
-
-   - Split by season or by date to simulate true forecasting (e.g. train on seasons 2022-23 & 2023-24, test on 2024-25).
-   - Ensure no data leakage by time.
-
-4. **Model Selection & Hyperparameter Tuning**
-
-   - Use `lightgbm.LGBMRegressor` with early stopping on a validation set.
-   - Grid-search window sizes (5, 10, 15) and key hyperparameters (`num_leaves`, `max_depth`, `learning_rate`).
-
-5. **Cross-Validation**
-
-   - Perform 5-fold time-series cross-validation to measure RMSE stability.
-   - Save the best model and scaler artifacts to `ml_dev/models/`.
-
----
-
-## 📈 Model Evaluation
-
-After training, the final model is evaluated on a hold-out season:
-
-| Metric        | Value     |
-| ------------- | --------- |
-| RMSE (points) | **4.070**  |
-| MAE (points)  | **2.601**  |
-| R²            | **0.798** |
-
-### Feature Importance
-
-
-
-- **Top 5 Features**:
-  1. `avg_pts_opp_position_last_10_per36`
-  2. `fieldGoalsMade_per_poss_rolling_5`
-  3. `offensiveRating_per_position_all_per_poss`
-  4. `avg_pts_opp_position_last_20_per36`
-  5. `avg_pts_opp_position_last_all_per36`
-
-### Error Analysis
-
-- Analyze residuals by position, by opponent, and by minutes played to identify systematic biases.
-- Visualize prediction vs. actual scatter plots for sample games.
-
----
-
-## 🚀 Future Improvements
-
-- **Automated Retraining**: Add a scheduled job to retrain the model weekly or monthly when performance degrades.
-- **Advanced Models**: Experiment with tree ensembles (XGBoost), stacking, or neural networks for further gains.
-- **Feature Expansion**: Incorporate opponent defensive metrics, player injury status, and lineup configurations.
-- **API Service**: Expose predictions via a REST API (FastAPI/Flask) for real-time applications.
-- **Dashboard**: Build an interactive dashboard (Plotly Dash or Power BI) to visualize predictions and model performance.
-
----
-
-*Generated on 2025-08-02*
+## 🛣️ Next Improvements and Features
+- **🔁 Automated Retraining**: Add a scheduled job to retrain the model weekly or monthly when performance degrades.
+- **➕ More stats** (AST / TOV / REB)
+- **🩺 Injury-aware predictions**
+- **🌐 API Service**: Expose predictions via a REST API (FastAPI/Flask) for real-time applications.
+- **📊 Dashboard**: Build an interactive dashboard (Plotly Dash or Power BI) to visualize predictions and model performance.
