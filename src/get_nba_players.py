@@ -1,50 +1,86 @@
-import pandas as pd 
-import time 
+import pandas as pd
 
 from nba_api.stats.endpoints import playerindex
-from nba_api.stats.endpoints import commonplayerinfo
+
 from common.singleton_meta import SingletonMeta
-from common.utils import  save_database_local
-import nba_api.stats.library.http as http_lib
-import nba_api.stats.library.http as http
-http_lib._NBAStatsHTTP__timeout = 60
-# Make the NBA-API pretend to be a browser
-http.NBAStatsHTTP.headers.update({
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-})
+from common.io_utils import PlayersFileName, save_database
+from common.constants import  nba_api_timeout
+
+
 
 class NbaPlayersData(metaclass=SingletonMeta):
     """
-    A class to fetch and update NBA players data.
+    Simple process:
+    - Loop CommonTeamRoster(season, team_id) for all 30 teams
+    - Keep core columns (PLAYER_ID, TEAM_ID, POSITION, HEIGHT, WEIGHT, NUM)
+    - (Optional) Use CommonPlayerInfo per player if you ever want extra fields
+    - Save with save_database like your other processes
     """
 
-    def __init__(self, current_season: str) -> None:
+    def __init__(self, current_season: str, save_mode: str,
+                    proxy_user: str = None, proxy_pass: str = None) -> None:
         """
-        Initialize the NBA players data object.
+        Initialize the NBA players data for a given season
             Args:
-                current_season (str): The current season in the format "YYYY-YY".
+                current_season (str) : The season to fetch players for, e.g., "2024-25" 
+                save_mode (str): Where to save the output ('bq' or 'local')
+                proxy_user (str, optional): Proxy username if needed. Defaults to None.
+                proxy_user (str, optional): Proxy password if needed. Defaults to None.
         """
-        self.current_season: str = current_season
-        self.file_name: str = f"nba_players_df_{current_season}"
-
+        self.current_season: str = current_season  # e.g., "2024-25""
+        self.SAVE_MODE: str = save_mode
+        # Build proxy string only if not running locally
+        if self.SAVE_MODE != "local" and proxy_user and proxy_pass:
+            self.proxy: str = f"http://{proxy_user}:{proxy_pass}@gate.decodo.com:10001"
+        else:
+            self.proxy: str = None
+  
     def get_nba_players_index(self) -> pd.DataFrame:
         """
         Fetch NBA players data from the NBA stats API and clean it.
         """
         # Get a list of all NBA teams (each team is represented as a dictionary)
         print("Fetching Active NBA players data from API...")
-        playerindex_df: pd.DataFrame =  playerindex.PlayerIndex(season=self.current_season).get_data_frames()[0]
+        playerindex_df: pd.DataFrame =  playerindex.PlayerIndex(season=self.current_season,
+                                                                proxy= self.proxy,
+                                                                timeout= nba_api_timeout
+                                                                ).get_data_frames()[0]
 
+        # Select relevant columns 
+        playerindex_df = playerindex_df[
+            ["PERSON_ID",
+             "PLAYER_LAST_NAME",
+             "PLAYER_FIRST_NAME",
+             "PLAYER_SLUG",
+             "TEAM_ID",
+             "TEAM_ABBREVIATION",
+             "JERSEY_NUMBER",
+             "POSITION",
+             "HEIGHT",
+             "WEIGHT",
+             "COLLEGE",
+             "COUNTRY",
+             "DRAFT_YEAR",
+             "DRAFT_ROUND",
+             "DRAFT_NUMBER",
+             "ROSTER_STATUS",
+             "FROM_YEAR",
+             "TO_YEAR"
+            ]]
+        
+        # Lower case column names 
+        playerindex_df.columns = [col.lower() for col in playerindex_df.columns]
+                
         return playerindex_df
 
-
     def run(self) -> None:
-        """
-        Run the process to fetch and update NBA players data.
-        """
-
-        # Get detailed player information for the active players
-        players_df: pd.DataFrame = self.get_nba_players_index()
-        
-        # Save the df as .csv file in the databases folder
-        save_database_local(players_df, self.file_name)
+        print(f"Fetching NBA players for season {self.current_season} ...")
+        try:
+            df = self.get_nba_players_index()
+            if df is not None and not df.empty:
+                save_database(df, PlayersFileName, mode=self.SAVE_MODE)
+                print(f"✅ Players data saved with mode: {self.SAVE_MODE} (rows={len(df)})")
+            else:
+                print("⚠️ No players data fetched. Process skipped.")
+        except Exception as e:
+            print(f"❌ Failed to fetch players: {e}")

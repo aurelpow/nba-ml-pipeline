@@ -1,49 +1,51 @@
 """
-This module contains the common variables used in the NBA Stats Data Pipeline.
+This module contains common utility functions for NBA data processing.
 """
-import os 
-import pandas as pd
+import pandas as pd 
+import numpy as np 
 
-
-# Define the names of the files to be used in the databases folder.
-AdvancedBoxscoreFileName = "nba_boxscore_advanced" 
-BoxscoreFileName = "nba_boxscore_basic"
-PlayersFileName = "nba_players_df"
-TeamsFileName = "nba_teams_df"
-FutureGamesFileName = "nba_future_games_df"
-PredictionsFileName = 'nba_points_predictions_df'
-
-# Define the path to the databases folder.
-databases_path = "databases/"
-
-def save_database_local(df_to_save: pd.DataFrame, df_to_save_name: str) -> None:
+# Function to extract season from game_id
+def extract_season(game_id):
     """
-    Save the DataFrame to an Excel file in the 'databases' folder.
-    
+    Extract the season year from a given game_id.
     Args:
-        df_to_save (pd.DataFrame): The DataFrame to save.
-        df_to_save_name (str): The base name for the saved file.
+        game_id (str or int): The game ID from which to extract the season.
+        Returns:
+        int: The extracted season year (e.g., 2023 for the 2023-24 season).
     """
-    # Append .xlsx extension if not already present.
-    if not df_to_save_name.lower().endswith('.csv'):
-        df_to_save_name = f"{df_to_save_name}.csv"
-    file_path = f"databases/{df_to_save_name}"
-    df_to_save.to_csv(file_path, index=False)
-    print(f"Saved to database: {file_path}")
+    try:
+        if pd.isnull(game_id):
+            return np.nan
+        if len(str(game_id)) == 8:
+            gid = str(game_id)[1:3]
+            return int(gid) + 2000
+        
+        if game_id.startswith('00'):
+            gid = game_id[3:5]
+            return int(gid) + 2000
+    except Exception:
+        return np.nan
 
-
-def load_existing_boxscores(FileName: str) -> pd.DataFrame:
+# Function to transform minutes from string to float
+def parse_minutes(val):
     """
-    Load already fetched df if available.
-    
-    Returns:
-        pd.DataFrame: The existing DataFrame or an empty one.
+    Convert 'MM:SS' or 'H:MM:SS' to minutes (float).
+    Args:
+        val (str or float): The minutes string or numeric value.    
+        Returns:
+            float: The total minutes as a float.
     """
-    file_path = f"{databases_path}{FileName}.csv"
-    if os.path.exists(file_path):
-        try:
-            df_existing = pd.read_csv(file_path)
-            return df_existing
-        except Exception as e:
-            print(f"Error loading existing boxscore file: {e}")
-    return pd.DataFrame()
+    if pd.isna(val) or val == '':
+        return 0.0
+    try:
+        parts = str(val).split(':')
+        if len(parts) == 2:  # MM:SS
+            m, s = map(int, parts)
+            return m + s / 60
+        elif len(parts) == 3:  # H:MM:SS
+            h, m, s = map(int, parts)
+            return h * 60 + m + s / 60
+        else:
+            return float(val)  # already numeric
+    except Exception:
+        return 0.0  # fallback if unexpected format

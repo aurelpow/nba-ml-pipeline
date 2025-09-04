@@ -1,27 +1,38 @@
-FROM python:3.9-slim
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-# 0) Install OS-level deps (libgomp for LightGBM + cleanup)
+# OS deps (LightGBM runtime) + clean
 RUN apt-get update \
- && apt-get install -y --no-install-recommends libgomp1 \
+ && apt-get install -y --no-install-recommends libgomp1 ca-certificates bash dos2unix \
  && rm -rf /var/lib/apt/lists/*
 
-# 1) Install Python deps
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Create an empty writable data dir in the image
+RUN mkdir -p /app/databases
 
-# 2) Copy application code
-COPY main.py .
+# Install deps first for better caching
+COPY requirements.txt .
+RUN pip install --upgrade pip \
+ && pip install --no-cache-dir -r requirements.txt
+
+# Copy code
+COPY main.py ./ 
 COPY src/    ./src
 COPY common/ ./common
-COPY run_all.sh .
+COPY scripts/ ./scripts
 
-# 3) Copy your model artifact(s)
-COPY ml_dev/models/best_lgbm_model_v2.pkl ml_dev/models/
+# Ensure LF endings + executable; then remove build-only pkgs
+RUN dos2unix ./scripts/run_all.sh \
+ && chmod +x ./scripts/run_all.sh \
+ && apt-get purge -y dos2unix \
+ && apt-get autoremove -y \
+ && rm -rf /var/lib/apt/lists/*
 
-# 4) Ensure run_all.sh is executable
-RUN chmod +x run_all.sh
+# Entrypoint provides the orchestrator
+ENTRYPOINT ["./scripts/run_all.sh"]
 
-# 5) Use your launcher as the entrypoint
-ENTRYPOINT ["./run_all.sh"]
+# CMD can be empty because the script reads env
+CMD []
