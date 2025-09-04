@@ -1,0 +1,2 @@
+# Tell linguist to treat .ipynb as documentation, not code
+*.ipynb linguist-documentation
