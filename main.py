@@ -10,6 +10,7 @@ from src.get_nba_teams import NbaTeamsData
 from src.get_nba_schedule import ScheduleData
 from src.get_nba_advanced_boxscore import AdvancedBoxscoreGames
 from src.get_predictions_stats_points import PredictionsStatsPoints 
+from src.train_model import train as train_model_entry
 from common.parser import build_parser
 
 
@@ -18,14 +19,27 @@ def main():
 
     parser:argparse.ArgumentParser = argparse.ArgumentParser(description="NBA Stats Data Pipeline")
 
-    process_name, current_season,save_mode,season_type, date, model_path = build_parser(parser)
+    (
+        process_name,
+        current_season,
+        save_mode,
+        season_type,
+        date,
+        model_path,
+        learning_rate,
+        num_leaves,
+        num_boost_round,
+    ) = build_parser(parser)
 
-    valid_processes: list[str] = ["get_nba_players",
-                                  "get_nba_teams", 
-                                  "get_nba_schedule",
-                                  "get_nba_boxscore_basic",  
-                                  "get_nba_advanced_boxscore",
-                                  "get_predictions_stats_points"]
+    valid_processes: list[str] = [
+        "get_nba_players",
+        "get_nba_teams",
+        "get_nba_schedule",
+        "get_nba_boxscore_basic",
+        "get_nba_advanced_boxscore",
+        "get_predictions_stats_points",
+        "train_model",
+    ]
     
     # Debugging: Print received process_name and valid processes
     print(f"Received process_name: {process_name}")
@@ -78,6 +92,17 @@ def main():
     elif process_name == "get_predictions_stats_points":
         print(f"Running process: {process_name} with date: {date} and model path:{model_path}")
         PredictionsStatsPoints( save_mode=save_mode,date=date,model_path=model_path).run()
+    elif process_name == "train_model":
+        print(f"Running process: {process_name} (learning_rate={learning_rate}, num_leaves={num_leaves}, rounds={num_boost_round})")
+        # Delegate to training entrypoint
+        class A:  # simple namespace for args
+            pass
+        args = A()
+        args.learning_rate = float(learning_rate)
+        args.num_leaves = int(num_leaves)
+        args.num_boost_round = int(num_boost_round)
+        args.model_filename = None
+        train_model_entry(args)
         
     # print the time taken to run the process    
     print(f"Process {process_name} completed in {datetime.today() - time_start}.")

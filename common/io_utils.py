@@ -22,8 +22,10 @@ ScheduleFileName: str = 'nba_schedule_df'
 
 # Define the path to the databases folder.
 databases_path: str = "databases/"
-PROJECT_ID = "ml-nba-project"
-DATASET_ID = "nba_dataset"
+from common.config import settings
+
+PROJECT_ID = settings.gcp_project_id
+DATASET_ID = settings.bigquery_dataset
 
 def _table_ref(table_name: str) -> str:
     return f"{PROJECT_ID}.{DATASET_ID}.{table_name}"
@@ -90,7 +92,7 @@ def save_database(
     if mode != "bq":
         raise ValueError("Invalid mode: choose 'local' or 'bq'")
 
-    client = bigquery.Client()
+    client = bigquery.Client(project=PROJECT_ID)
     table_id = _table_ref(table_name)
 
     has_game_id = "gameId" in df.columns
@@ -142,8 +144,8 @@ def load_data(FileName: str, mode: str ) -> pd.DataFrame:
             return pd.DataFrame()
     elif mode == "bq":
         try:
-            client = bigquery.Client()
-            table_id = f"ml-nba-project.nba_dataset.{FileName}"
+            client = bigquery.Client(project=PROJECT_ID)
+            table_id = f"{PROJECT_ID}.{DATASET_ID}.{FileName}"
             df_existing = client.list_rows(table_id).to_dataframe()
             print(f"✅ Loaded {len(df_existing)} rows from {table_id}")
             return df_existing
@@ -177,7 +179,7 @@ def load_model_artifact(model_path: str, mode: str):
 
     # GCS mode: download to a temp file then load
     bucket_name, blob_name = _parse_gcs_uri(model_path)
-    client = storage.Client()  # uses default creds on Cloud Run Job
+    client = storage.Client(project=PROJECT_ID)  # uses default creds on Cloud Run Job
     blob = client.bucket(bucket_name).blob(blob_name)
 
     with tempfile.NamedTemporaryFile(suffix=".pkl", delete=False) as tmp:
@@ -190,3 +192,56 @@ def load_model_artifact(model_path: str, mode: str):
             os.remove(tmp_path)
         except OSError:
             pass
+
+
+def save_model_artifact(model, destination_path: str) -> str:
+    """
+    Save a model artifact either locally or to GCS (if destination_path starts with gs://).
+
+    Returns the final URI used.
+    """
+    is_gcs = isinstance(destination_path, str) and destination_path.startswith("gs://")
+    if not is_gcs:
+        os.makedirs(os.path.dirname(destination_path), exist_ok=True)
+        joblib.dump(model, destination_path)
+        return destination_path
+
+    bucket_name, blob_name = _parse_gcs_uri(destination_path)
+    client = storage.Client(project=PROJECT_ID)
+    with tempfile.NamedTemporaryFile(suffix=".pkl", delete=False) as tmp:
+        tmp_path = tmp.name
+    try:
+        joblib.dump(model, tmp_path)
+        client.bucket(bucket_name).blob(blob_name).upload_from_filename(tmp_path)
+        return destination_path
+    finally:
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
+
+
+def log_run_to_bigquery(table_name: str, rows: list[dict]) -> None:
+    """
+    Append rows to a BigQuery table; creates the table if missing (schema autodetect).
+    Falls back to local CSV if SAVE_MODE is local.
+    """
+    if not rows:
+        return
+
+    df = pd.DataFrame(rows)
+    if settings.save_mode == "local":
+        path = f"databases/{table_name}.csv"
+        if os.path.exists(path):
+            existing = pd.read_csv(path)
+            df = pd.concat([existing, df], ignore_index=True)
+        df.to_csv(path, index=False)
+        print(f"📝 Logged run locally to {path}")
+        return
+
+    client = bigquery.Client(project=PROJECT_ID)
+    table_id = _table_ref(table_name)
+    load_config = bigquery.LoadJobConfig(write_disposition="WRITE_APPEND", autodetect=True)
+    job = client.load_table_from_dataframe(df, table_id, job_config=load_config)
+    job.result()
+    print(f"📝 Logged {len(rows)} row(s) to {table_id}")

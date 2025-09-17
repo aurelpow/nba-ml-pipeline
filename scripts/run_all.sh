@@ -7,7 +7,7 @@ set -euo pipefail
 : "${SAVE_MODE:=bq}"                    # default to BigQuery
 : "${DATE:?Please set DATE (e.g. 2025-05-05)}"
 : "${DAYS_NUMBER:=1}"
-: "${MODEL_PATH:=ml_dev/models/best_lgbm_model_v2.pkl}"
+: "${MODEL_PATH:=ml_dev/models/best_lgbm_model.pkl}"
 
 # Optional proxy creds (exported if present)
 : "${NBA_PROXY_USER:=}"
@@ -53,6 +53,10 @@ log "✅ Finished get_nba_boxscore_basic"
 log "➡️ Running get_nba_advanced_boxscore..."
 python main.py -p get_nba_advanced_boxscore -s "$SEASON" -st "$SEASON_TYPE" -sm "$SAVE_MODE"
 log "✅ Finished get_nba_advanced_boxscore"
+
+log "➡️ Training model..."
+python main.py -p train_model --learning_rate 0.05 --num_leaves 64 --num_boost_round 400
+log "✅ Finished training model"
 
 log "➡️ Running get_predictions_stats_points..."
 python main.py -p get_predictions_stats_points -sm "$SAVE_MODE" -d "$DATE" -m "$MODEL_PATH"

@@ -17,6 +17,13 @@ def build_parser(parser:argparse.ArgumentParser):
     parser.add_argument("-st","--season_type", type=str, default=None, help="Type of season to run the process for")
     parser.add_argument("-d","--date", type=str, default=None, help="Date to run the process for (optional)")
     parser.add_argument("-m","--model_path", type=str, default=None, help="Path to the model for predictions (optional)")
+    # Training hyperparameters (optional)
+    parser.add_argument("--learning_rate", type=float, default=0.05, help="Learning rate for training (optional)")
+    parser.add_argument("--num_leaves", type=int, default=64, help="Num leaves for LightGBM (optional)")
+    parser.add_argument("--num_boost_round", type=int, default=500, help="Boost rounds (optional)")
+    parser.add_argument("--learning_rate", type=float, default=0.05, help="Learning rate for training (optional)")
+    parser.add_argument("--num_leaves", type=int, default=64, help="Num leaves for LightGBM (optional)")
+    parser.add_argument("--num_boost_round", type=int, default=500, help="Boost rounds (optional)")
     
     # Get the arguments from the parser
     args = parser.parse_args()
@@ -28,4 +35,14 @@ def build_parser(parser:argparse.ArgumentParser):
     date = args.date
     model_path = args.model_path 
     
-    return process_name, current_season, save_mode, season_type, date, model_path
+    return (
+        process_name,
+        current_season,
+        save_mode,
+        season_type,
+        date,
+        model_path,
+        args.learning_rate,
+        args.num_leaves,
+        args.num_boost_round,
+    )
