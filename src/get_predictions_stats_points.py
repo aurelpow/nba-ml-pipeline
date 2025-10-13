@@ -361,7 +361,6 @@ class PredictionsStatsPoints(metaclass = SingletonMeta):
             how='inner'
         )
 
-        print(list(future_games_long.columns))
         # Fill NaN values with 0 for prediction    
         X_pred = future_games_long[numeric_feats].fillna(0)
 

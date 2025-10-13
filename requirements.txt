@@ -5,6 +5,7 @@ joblib>=1.5
 pyarrow>=19.0
 nba_api>=1.10.0
 scikit-learn>=1.6
+protobuf=4.25.3
 google-cloud-storage>=2.18.0
 google-cloud-bigquery>=3.10.0
 google-cloud-bigquery-storage>=2.25.0
