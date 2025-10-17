@@ -5,7 +5,6 @@ set -euo pipefail
 : "${SEASON:?Please set SEASON (e.g. 2024-25)}"
 : "${SEASON_TYPE:=Regular Season}"      # default to Regular Season
 : "${SAVE_MODE:=bq}"                    # default to BigQuery
-: "${DATE:?Please set DATE (e.g. 2025-05-05)}"
 : "${DAYS_NUMBER:=1}"
 : "${MODEL_PATH:=ml_dev/models/best_lgbm_model_v2.pkl}"
 
@@ -14,21 +13,22 @@ set -euo pipefail
 : "${NBA_PROXY_PASS:=}"
 export NBA_PROXY_USER NBA_PROXY_PASS PYTHONUNBUFFERED=1
 
+# If DATE not provided, use "today" in Europe/Madrid
+if [ -z "${DATE:-}" ]; then
+  DATE="$(python - <<'PY'
+from datetime import datetime
+from zoneinfo import ZoneInfo  # Python 3.10+ image has it
+z = ZoneInfo("Europe/Madrid")
+print(datetime.now(z).date().isoformat())
+PY
+)"
+fi
+
 # ---- helpers ----
 ts() { date -u +"%Y-%m-%dT%H:%M:%SZ"; }
 log() { echo "[$(ts)] $*"; }
 trap 'echo "[ERROR $(ts)] Failed at line $LINENO"; exit 1' ERR
 
-# ---- basic validation ----
-if ! [[ "$DATE" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
-  echo "DATE must be YYYY-MM-DD (got: $DATE)"
-  exit 2
-fi
-
-if ! [[ "$DAYS_NUMBER" =~ ^[0-9]+$ ]]; then
-  echo "DAYS_NUMBER must be an integer (got: $DAYS_NUMBER)"
-  exit 2
-fi
 
 # ---- main ----
 
@@ -53,6 +53,10 @@ log "✅ Finished get_nba_boxscore_basic"
 log "➡️ Running get_nba_advanced_boxscore..."
 python main.py -p get_nba_advanced_boxscore -s "$SEASON" -st "$SEASON_TYPE" -sm "$SAVE_MODE"
 log "✅ Finished get_nba_advanced_boxscore"
+
+log "➡️ Running train_model..."
+python main.py -p train_model -sm "$SAVE_MODE" -m "$MODEL_PATH"
+log "✅ Finished train_model"
 
 log "➡️ Running get_predictions_stats_points..."
 python main.py -p get_predictions_stats_points -sm "$SAVE_MODE" -d "$DATE" -m "$MODEL_PATH"
