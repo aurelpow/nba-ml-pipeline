@@ -7,8 +7,6 @@ trains a LightGBM or XGBoost regressor. The implementation is intentionally
 robust to minor schema differences in the input tables.
 """
 
-from __future__ import annotations
-
 import logging 
 import os
 from typing import Dict, List, Optional, Tuple, Any
@@ -21,7 +19,7 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
 from sklearn.model_selection import RandomizedSearchCV, TimeSeriesSplit
 
-from common.io_utils import BoxscoreFileName, AdvancedBoxscoreFileName, PlayersFileName, load_data
+from common.io_utils import BoxscoreFileName, AdvancedBoxscoreFileName, PlayersFileName, load_data, save_database, MetricsFileName
 from common.utils import  parse_minutes
 from common.constants import key_stats_points, categorical_cols_points, target_variable_points
 
@@ -131,53 +129,59 @@ class ModelTrainer:
     
     def historical_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Create historical performance features.
+        Create historical performance features based on position group opponent and game date.(time aware)
         Args:
             df (pd.DataFrame): The input DataFrame already prepared with basic features.
         Return:
             pd.DataFrame: The DataFrame with historical features added.
         """
-        # Filter out bench players
-        df_hist: pd.DataFrame = df[df['position'] != 'BENCH']
-        
-        # Compute historical averages
-        df_avg: pd.DataFrame = (
+        # Filter out bench players and copy to avoid SettingWithCopyWarning
+        df_hist = df[df['position'] != 'BENCH'].copy()
+
+        # Compute historical mean points per (position_group, opponent, game_date)
+        df_avg = (
             df_hist
-            .groupby(['position_group','opponent','game_date'])['points']
+            .groupby(['position_group', 'opponent', 'game_date'], as_index=False)['points']
             .mean()
-            .reset_index(name='avg_points')
+            .rename(columns={'points': 'avg_points'})
         )
 
-        # Sort by 'position_group', 'opponent', and 'game_date' to ensure rolling and tail operations
-        # are performed in the correct chronological order for each group.
-        df_avg: pd.DataFrame = df_avg.sort_values(
-            ['game_date', 'position_group', 'opponent'],
-            ascending=[True, True, True],
-            na_position='last'
+        # sort chronologically per group (oldest -> newest)
+        df_avg = df_avg.sort_values(['position_group', 'opponent', 'game_date'], ascending=[True, True, True]).reset_index(drop=True)
+
+        # Compute rolling averages shifted by 1 to avoid data leakage
+        grp = df_avg.groupby(['position_group', 'opponent'])['avg_points']
+        df_avg['avg_pts_opp_position_last_10'] = grp.apply(lambda x: x.shift(1).rolling(10, min_periods=1).mean()).reset_index(level=[0,1], drop=True)
+        df_avg['avg_pts_opp_position_last_20'] = grp.apply(lambda x: x.shift(1).rolling(20, min_periods=1).mean()).reset_index(level=[0,1], drop=True)
+        df_avg['avg_pts_opp_position_all'] = grp.apply(lambda x: x.shift(1).expanding().mean()).reset_index(level=[0,1], drop=True)
+
+
+        # Merge back by date so each row only sees past info
+        final_df = df.merge(
+            df_avg[['position_group', 'opponent', 'game_date',
+                    'avg_pts_opp_position_last_10',
+                    'avg_pts_opp_position_last_20',
+                    'avg_pts_opp_position_all']],
+            on=['position_group', 'opponent', 'game_date'],
+            how='left'
         )
 
-        # Aggregate per (position_group, opponent)
-        result: pd.DataFrame = (
-            df_avg
-            .groupby(['position_group','opponent'])
-            .apply(lambda g: pd.Series({
-                'avg_pts_opp_position_last_10': g['avg_points'].tail(10).mean(),
-                'avg_pts_opp_position_last_20': g['avg_points'].tail(20).mean(),
-                'avg_pts_opp_position_all'   : g['avg_points'].mean()
-            }))
-            .reset_index()
-        )
-
-        # Put these stats back on final_df 
-        final_df: pd.DataFrame = (
-            df
-            .merge(result[['position_group',
-                           'opponent',
-                           'avg_pts_opp_position_last_10',
-                           'avg_pts_opp_position_last_20',
-                           'avg_pts_opp_position_all']],
-                on=['position_group','opponent'],
-                how='left')
+        # Fill NaN for first occurrences
+        final_df[['avg_pts_opp_position_last_10',
+                  'avg_pts_opp_position_last_20',
+                  'avg_pts_opp_position_all']] = final_df[[
+                      'avg_pts_opp_position_last_10',
+                      'avg_pts_opp_position_last_20',
+                      'avg_pts_opp_position_all']].fillna(0)
+        
+        # Check the result for a specific opponent and position group (distinct rows only)
+        specific_result = (
+            final_df[
+            (final_df['opponent'] == 1610612747) &
+            (final_df['position_group'] == 'G')
+            ]
+            .sort_values('game_date')
+            .reset_index(drop=True)
         )
 
         return final_df
@@ -213,8 +217,8 @@ class ModelTrainer:
             pd.DataFrame: The DataFrame with rolling average features added.
         """
         # Sort by personId and game_date to ensure correct rolling calculations
-        df: pd.DataFrame = df.sort_values(by=['personId', 'game_date'], ascending=[True, False]).copy()
-        # Exlude Engineered stats
+        df: pd.DataFrame = df.sort_values(by=['personId', 'game_date'], ascending=[True, True]).copy()
+        # Exclude Engineered stats
         raw_stats: dict = {k:v for k,v in key_stats.items() if 'engineering' not in v.lower()}
         for period in raw_stats:
             for rolling_period in windows:
@@ -405,7 +409,7 @@ class ModelTrainer:
         
         random_search.fit(X_train, y_train)
 
-        print(f"✅ Best CV R²: {-random_search.best_score_:.4f}")
+        print(f"✅ Best CV RMSE: {-random_search.best_score_:.4f}")
         print(f"📋 Best params: {random_search.best_params_}")
         
         return random_search.best_params_
@@ -419,9 +423,7 @@ class ModelTrainer:
         Args:
             X_train: training features
             y_train: training target
-            best_params: optimized hyperparameters
-            decay_alpha: decay rate for time weighting (higher = more recent emphasis)
-            
+            best_params: optimized hyperparameters            
         Returns:
             trained LGBMRegressor model
         """
@@ -475,10 +477,6 @@ class ModelTrainer:
             'overfitting_gap': train_r2 - test_r2
         }
         
-        print(f"  Test  → R²={test_r2:.4f}, RMSE={test_rmse:.4f}, MAE={test_mae:.4f}")
-        print(f"  Train → R²={train_r2:.4f}, RMSE={train_rmse:.4f}")
-        print(f"  Overfit Gap: {metrics['overfitting_gap']:.4f}")
-        
         return metrics
     
     def train_model(self, df: pd.DataFrame, target: str, 
@@ -510,7 +508,7 @@ class ModelTrainer:
         
         train_df: pd.DataFrame = df[df['game_date'] < split_date]
         test_df: pd.DataFrame = df[df['game_date'] >= split_date]
-        
+
         X_train, y_train = train_df[feature_cols], train_df[target]
         X_test, y_test = test_df[feature_cols], test_df[target]
         
@@ -634,6 +632,17 @@ class ModelTrainer:
         print(f"  Test R²: {metrics['test_r2']:.4f}")
         print(f"  Test RMSE: {metrics['test_rmse']:.4f}")
 
+        # Save metrics to database
+        # First transform metrics to DataFrame
+        metrics_df = pd.DataFrame([metrics])
+        
+        save_database(df= metrics_df,
+                      table_name=MetricsFileName, 
+                      mode=self.SAVE_MODE,
+                      write_disposition="WRITE_APPEND")
+        
+        return None
+    
     def run(self, 
             tune_params: bool = True, n_iter: int = 20) -> None:
         """

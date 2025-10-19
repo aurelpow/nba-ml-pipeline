@@ -1,8 +1,8 @@
 import datetime
 import pandas as pd
 import numpy as np 
-
 from typing import Any, Dict
+
 from sklearn.preprocessing import OneHotEncoder
 
 from common.singleton_meta import SingletonMeta
@@ -34,10 +34,9 @@ class PredictionsStatsPoints(metaclass = SingletonMeta):
 
     def read_data(self) -> Dict[str, pd.DataFrame]:
         """
-        Load boxscore / advanced / players tables using `load_data`.
-
+        Load the necessary data from storage.
         Returns:
-            Dictionary with keys 'boxscore', 'advanced', 'players' (DataFrames).
+            Dictionary mapping file names to DataFrames.
         """
         box: pd.DataFrame = load_data(BoxscoreFileName, mode=self.SAVE_MODE)
         adv: pd.DataFrame = load_data(AdvancedBoxscoreFileName, mode=self.SAVE_MODE)
@@ -54,8 +53,9 @@ class PredictionsStatsPoints(metaclass = SingletonMeta):
         Get future games with players who are playing in the future games.
         Args: 
             data_map (dict): A dictionary containing the loaded data.
-            Returns:
-                pd.DataFrame: A DataFrame with future games and players.
+
+        Returns:
+            pd.DataFrame: A DataFrame with future games and players.
         """
         # Extract the future games and players DataFrame from the data map
         all_schedule_df: pd.DataFrame = data_map[ScheduleFileName]
@@ -120,6 +120,10 @@ class PredictionsStatsPoints(metaclass = SingletonMeta):
         boxscore_df: pd.DataFrame = df_map[BoxscoreFileName]
         advanced_boxscore_df: pd.DataFrame = df_map[AdvancedBoxscoreFileName]
         players_df: pd.DataFrame = df_map[PlayersFileName]
+
+        # Filter dataframes to include only games before the specified date
+        boxscore_df: pd.DataFrame = boxscore_df[pd.to_datetime(boxscore_df['game_date']).dt.date < self.date]
+        advanced_boxscore_df: pd.DataFrame = advanced_boxscore_df[pd.to_datetime(advanced_boxscore_df['game_date']).dt.date < self.date]
 
         # From the boxscore remove rows with DNP or no minutes played
         boxscore_df: pd.DataFrame = boxscore_df[(boxscore_df['minutes'] == "0:00") | 
@@ -222,7 +226,8 @@ class PredictionsStatsPoints(metaclass = SingletonMeta):
 
         return final_df 
 
-    def normalize_numerical_data(self, df: pd.DataFrame) -> pd.DataFrame:
+    @staticmethod
+    def normalize_numerical_data( df: pd.DataFrame) -> pd.DataFrame:
         """
         Normalize the DataFrame by scaling numerical features.
         
@@ -249,8 +254,11 @@ class PredictionsStatsPoints(metaclass = SingletonMeta):
         rolling_periods: list = [5, 10, 20]
 
         # Filter out engineering stats (only normalize raw stats)
-        feature_cols_rolling: list = {k: v for k, v in key_stats_points.items() if 'engineering' not in v.lower()}
+        feature_cols_rolling: list[str] = [k for k, v in key_stats_points.items() if 'engineering' not in v.lower()]
         
+        # Sort chronologically so rolling is time-aware
+        df = df.sort_values(['personId', 'game_date'], ascending=[True, True]).copy()
+
         # Create rolling averages for the per-36 and per-possession metrics
         for period in feature_cols_rolling:
             for rolling_period in rolling_periods:
@@ -262,7 +270,7 @@ class PredictionsStatsPoints(metaclass = SingletonMeta):
         return df
 
     @staticmethod
-    def encode_categorical_data(df: pd.DataFrame) -> tuple[pd.DataFrame, list]:
+    def encode_categorical_data(df: pd.DataFrame) -> tuple[pd.DataFrame, list ]:
         """
         Encode categorical features in the DataFrame. 
         Args:
@@ -270,10 +278,9 @@ class PredictionsStatsPoints(metaclass = SingletonMeta):
         Returns:
             pd.DataFrame: A DataFrame with encoded categorical features.
         """   
-        # Encode categorical features using one-hot encoding
-        ## prepare the encoder
+        # Prepare the encoder
         encoder: OneHotEncoder = OneHotEncoder(sparse_output=False, handle_unknown='ignore')
-        ## fit and transform the data
+        # Fit and transform the data
         encoded_categorical: np.ndarray = encoder.fit_transform(df[categorical_cols_points])
 
         # Get the new feature names after encoding
@@ -287,44 +294,46 @@ class PredictionsStatsPoints(metaclass = SingletonMeta):
     
         return df, encoded_feature_names
     
-    def prepare_future_games_data(self,future_games_players_df : pd.DataFrame, encoded_data: pd.DataFrame, 
+    def prepare_future_games_data(self,future_games_players_df : pd.DataFrame, normalized_historical_data: pd.DataFrame, 
                                    feature_encoded_names)-> tuple[pd.DataFrame, pd.DataFrame]:
         """
         Prepare the future games data for predictions.
         Args:
-            data_map (dict): A dictionary containing the loaded data.
+            future_games_players_df (pd.DataFrame): The DataFrame with future games and players, encoded. 
+            normalized_historical_data (pd.DataFrame): The DataFrame with normalized historical data.
+            feature_encoded_names (list): List of encoded feature names.
         Returns:
             pd.DataFrame: A DataFrame with future games data ready for predictions.
         """
         # Get the latest stats for each player from final_df
         latest_stats: pd.DataFrame = (
-            encoded_data.sort_values('game_date')
+            normalized_historical_data.sort_values('game_date')
             .groupby('personId')
             .tail(1)
         )
 
         # Define feature columns to merge
-        numeric_feats = []
+        final_features = []
         rolling_periods = [5, 10, 20]
         feature_cols_rolling = {k: v for k, v in key_stats_points.items() if 'engineering' not in v.lower()}
         for rolling_period in rolling_periods:  
-            numeric_feats.extend([
+            final_features.extend([
                 f"{s}_per36_rolling_{rolling_period}" for s in feature_cols_rolling
             ])
-            numeric_feats.extend([
+            final_features.extend([
                 f"{s}_per_poss_rolling_{rolling_period}" for s in feature_cols_rolling
             ])
 
         # Add historical averages (engineering stats) - per36 first, then per_poss
         engineering_stats: list = [k for k, v in key_stats_points.items() if 'engineering' in v.lower()]
         for stat in engineering_stats:
-            numeric_feats.append(f"{stat}_per36")
+            final_features.append(f"{stat}_per36")
         
         for stat in engineering_stats:
-            numeric_feats.append(f"{stat}_per_poss")
+            final_features.append(f"{stat}_per_poss")
 
         # Add encoded categorical feature names
-        numeric_feats.extend(feature_encoded_names)
+        final_features.extend(feature_encoded_names)
 
         # Merge stats into future_games_long without duplicating columns
         # Drop columns from latest_stats that already exist in future_games_players_df except the join key
@@ -341,9 +350,9 @@ class PredictionsStatsPoints(metaclass = SingletonMeta):
         )
 
         # Fill NaN values with 0 for prediction    
-        X_pred: pd.DataFrame = future_games_long[numeric_feats].fillna(0)
-
-        return future_games_long ,X_pred
+        X_pred: pd.DataFrame = future_games_long[final_features].fillna(0)
+        
+        return future_games_long, X_pred
 
     def get_predictions(self,future_games_df ,X_pred : pd.DataFrame, model):
         """
@@ -413,12 +422,12 @@ class PredictionsStatsPoints(metaclass = SingletonMeta):
         # Normalize numerical data
         normalized_data: pd.DataFrame = self.normalize_numerical_data(historical_data_model)
         
-        # Encode categorical features and prepare the final dataframe for predictions
-        encoded_dataframe, feature_encoded_names = self.encode_categorical_data(normalized_data)
+        # Encode categorical features for future games players
+        future_encoded_dataframe, feature_encoded_names = self.encode_categorical_data(future_games_players)
 
         # Prepared dataframe 
-        future_games_long_df, X_pred_df = self.prepare_future_games_data(future_games_players,
-                                                                          encoded_dataframe, feature_encoded_names)
+        future_games_long_df, X_pred_df = self.prepare_future_games_data(future_encoded_dataframe,
+                                                                          normalized_data, feature_encoded_names)
         
         return future_games_long_df, X_pred_df
     

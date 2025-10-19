@@ -5,7 +5,6 @@ set -euo pipefail
 : "${SEASON:?Please set SEASON (e.g. 2024-25)}"
 : "${SEASON_TYPE:=Regular Season}"      # default to Regular Season
 : "${SAVE_MODE:=bq}"                    # default to BigQuery
-: "${DAYS_NUMBER:=1}"
 : "${MODEL_PATH:=ml_dev/models/best_lgbm_model_v2.pkl}"
 
 # Optional proxy creds (exported if present)
@@ -17,7 +16,7 @@ export NBA_PROXY_USER NBA_PROXY_PASS PYTHONUNBUFFERED=1
 if [ -z "${DATE:-}" ]; then
   DATE="$(python - <<'PY'
 from datetime import datetime
-from zoneinfo import ZoneInfo  # Python 3.10+ image has it
+from zoneinfo import ZoneInfo
 z = ZoneInfo("Europe/Madrid")
 print(datetime.now(z).date().isoformat())
 PY
