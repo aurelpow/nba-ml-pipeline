@@ -171,7 +171,7 @@ class PredictionsStatsPoints(metaclass = SingletonMeta):
         # Parse minutes from string to float using common.utils function
         df_to_process['minutes'] = df_to_process['minutes'].apply(parse_minutes)
         
-        # fill NaN values in 'position' witch 'BENCH'
+        # fill NaN values in 'position' with 'BENCH'
         df_to_process['position'] = df_to_process['position'].fillna('bench')
         
         # Create a new column 'position_group' based on 'POSITION' and 'position' 
@@ -290,7 +290,9 @@ class PredictionsStatsPoints(metaclass = SingletonMeta):
         df: pd.DataFrame = df.drop(categorical_cols_points, axis=1)
 
         # put the encoded categorical features back into the DataFrame
-        df: pd.DataFrame = pd.concat([df, pd.DataFrame(encoded_categorical, columns=encoder.get_feature_names_out(categorical_cols_points))], axis=1)
+        df: pd.DataFrame = pd.concat([df, pd.DataFrame(encoded_categorical, 
+                                                       columns=encoder.get_feature_names_out(categorical_cols_points), 
+                                                       index=df.index)], axis=1)
     
         return df, encoded_feature_names
     

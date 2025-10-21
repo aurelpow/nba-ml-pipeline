@@ -45,16 +45,14 @@ class ModelTrainer:
         self.logger = logging.getLogger(__name__)
         self.model_path: str = model_path
         self.SAVE_MODE = save_mode
-        self.scaler: Optional[StandardScaler] = None
         self.feature_cols: List[str] = []
         self.logger.info("ModelTrainer initialized.")
 
     def read_data(self) -> Dict[str, pd.DataFrame]:
         """
-        Load boxscore / advanced / players tables using `load_data`.
-
+        Load necessary data tables for model training.
         Returns:
-            Dictionary with keys 'boxscore', 'advanced', 'players' (DataFrames).
+            Dict[str, pd.DataFrame]: dictionary with loaded dataframes
         """
         box = load_data(BoxscoreFileName, mode=self.SAVE_MODE)
         adv = load_data(AdvancedBoxscoreFileName, mode=self.SAVE_MODE)
@@ -174,16 +172,6 @@ class ModelTrainer:
                       'avg_pts_opp_position_last_20',
                       'avg_pts_opp_position_all']].fillna(0)
         
-        # Check the result for a specific opponent and position group (distinct rows only)
-        specific_result = (
-            final_df[
-            (final_df['opponent'] == 1610612747) &
-            (final_df['position_group'] == 'G')
-            ]
-            .sort_values('game_date')
-            .reset_index(drop=True)
-        )
-
         return final_df
 
     def normalize_features(self, df: pd.DataFrame, key_stats:dict[str, str]) -> pd.DataFrame:
@@ -289,11 +277,12 @@ class ModelTrainer:
         df: pd.DataFrame = df.drop(categorical_cols, axis=1)
 
         # Concatenate encoded columns to original dataframe
-        final_df: pd.DataFrame = pd.concat([df, pd.DataFrame(encoded_categorical, columns=encoder.get_feature_names_out(categorical_cols))], axis=1)
+        final_df: pd.DataFrame = pd.concat([df, pd.DataFrame(encoded_categorical, 
+                                                             columns=encoder.get_feature_names_out(categorical_cols), index=df.index)], axis=1)
         
         # Update feature_cols with new one-hot encoded columns
         self.feature_cols.extend(encoder.get_feature_names_out(categorical_cols).tolist())
-                
+
         return final_df
 
     @staticmethod
@@ -527,7 +516,7 @@ class ModelTrainer:
                 'max_depth': 7,
                 'num_leaves': 31
             }
-            print("⚙️  Using default hyperparameters (tune_params=False)")
+            self.logger.info("⚙️  Using default hyperparameters (tune_params=False)")
         
         # Step 4: Train final model
         model: LGBMRegressor = self._fit_final_model(X_train, y_train, best_params=best_params)
@@ -599,7 +588,7 @@ class ModelTrainer:
 
     def save_model(self, model, metrics, filepath) -> None:
         """
-        Save trained model, scaler, feature columns, and metrics to disk.
+        Save trained model, feature columns, and metrics to disk.
         
         Args:
             model: trained model to save
@@ -618,7 +607,6 @@ class ModelTrainer:
         # Package everything needed for prediction
         artifact: dict = {
             'model': model,
-            'scaler': self.scaler,
             'feature_cols': self.feature_cols,
             'metrics': metrics,
             'target': target_variable_points,
@@ -628,9 +616,9 @@ class ModelTrainer:
         }
         
         joblib.dump(artifact, filepath)
-        print(f"✅ Model saved successfully")
-        print(f"  Test R²: {metrics['test_r2']:.4f}")
-        print(f"  Test RMSE: {metrics['test_rmse']:.4f}")
+        self.logger.info(f"✅ Model saved successfully")
+        self.logger.info(f"  Test R²: {metrics['test_r2']:.4f}")
+        self.logger.info(f"  Test RMSE: {metrics['test_rmse']:.4f}")
 
         # Save metrics to database
         # First transform metrics to DataFrame
@@ -649,7 +637,6 @@ class ModelTrainer:
         Complete end-to-end training pipeline: read → transform → train → save.
         
         Args:
-            save_path: where to save the trained model
             tune_params: whether to perform hyperparameter tuning
             n_iter: number of hyperparameter tuning iterations
         """
@@ -660,6 +647,7 @@ class ModelTrainer:
             self.logger.info("Model training completed.")
 
             self.logger.info("Saving model artifact...")
+
             # Save model artifact
             self.save_model(model, metrics, filepath=self.model_path)
             self.logger.info("Model artifact saved.")
