@@ -6,7 +6,7 @@ import requests
 from nba_api.stats.endpoints import boxscoreadvancedv3
 from nba_api.stats.library.parameters import LeagueID
 from common.io_utils import  (save_database, load_data,
-                            AdvancedBoxscoreFileName)
+                            AdvancedBoxscoreFileName, ScheduleFileName)
 from common.constants import  nba_api_timeout
 from common.singleton_meta import SingletonMeta
 
@@ -19,14 +19,14 @@ class AdvancedBoxscoreGames(metaclass=SingletonMeta):
     def __init__(self, current_season: str, save_mode: str, 
                  proxy_user: str = None, proxy_pass: str = None) -> None:
         """
-        Initialize the BoxscoreGames class with the current season and season type.
+        Initialize the AdvancedBoxscoreGames class with the current season and season type.
             Args:
                 current_season (str): The current season in the format "YYYY-YY".
                 save_mode (str): The mode to save data, either 'local' or 'bq' (google bigquery). 
                 proxy_user (str, optional): Proxy username if needed. Defaults to None.
                 proxy_user (str, optional): Proxy password if needed. Defaults to None.
         """
-        print(f"Initializing BoxscoreGames with season: {current_season}")
+        print(f"Initializing AdvancedBoxscoreGames with season: {current_season}")
         self.current_season: str = current_season
         self.current_season_year: int = int(current_season.split("-")[0])
         self.SAVE_MODE: str = save_mode
@@ -37,75 +37,56 @@ class AdvancedBoxscoreGames(metaclass=SingletonMeta):
             self.proxy: str = None
 
     def get_schedule(self) -> pd.DataFrame:
-            """
-            Fetch and process NBA schedule for self.current_season_year.
-            Only regular season & playoffs are returned.
-            Args:
-                None
-            Returns:
-                pd.DataFrame: Processed schedule data
-            """
-            # Define the URL for the NBA schedule data
-            url = (
-                f"https://data.nba.com/data/10s/v2015/json/mobile_teams/nba/"
-                f"{self.current_season_year}/league/{LeagueID.default}_full_schedule.json"
-            )
-            
-            # Get the data
-            r = requests.get(url)
-            data = r.json()
+        """
+        Fetch and process NBA schedule for self.current_season_year.
+        Only regular season & playoffs are returned.
+        Args:
+            None
+        Returns:
+            pd.DataFrame: Processed schedule data
+        """
+        # Load the full schedule from our schedule dataframe
+        schedule_df: pd.DataFrame = load_data(ScheduleFileName, mode=self.SAVE_MODE)
+        
+        # Ensure gameId is string with leading zeros
+        schedule_df['gameId'] = schedule_df['gameId'].astype(str).str.zfill(10)
+        
+        # Flag if games are in the playoffs
+        schedule_df['is_playoffs'] = schedule_df['gameId'].str.startswith('004')
 
-            # Initialize an empty list to store all games
-            all_games_list = []
-            
-            # Iterate through the league schedule data
-            for month in data['lscd']:
-                # Extract games from each month
-                if 'mscd' in month and 'g' in month['mscd']:
-                    games = month['mscd']['g']
-                    all_games_list.extend(games)
+        # Flag if games are in the Regular Season
+        schedule_df['is_regular_season'] = schedule_df['gameId'].str.startswith('002')
 
-            # Convert the list of games to a DataFrame
-            games_df = pd.json_normalize(all_games_list)
+        # Remove games not in regular season or playoffs
+        games_df = schedule_df[schedule_df['is_playoffs'] | schedule_df['is_regular_season']]
 
-            # Rename the columns to be more readable
-            games_df = games_df.rename(columns={
-                'gid': 'game_id',
-                'seri': 'playoffs_desc',
-                'st': 'game_status',
-                'stt': 'game_status_text',
-                'gdte': 'game_date',
-                'h.tid': 'home_team_id',
-                'h.ta': 'home_team_tricode',
-                'v.tid': 'visitor_team_id',
-                'v.ta': 'visitor_team_tricode',
-            })
+        # Rename columns for clarity
+        games_df = games_df.rename(columns={
+            "gameId": "game_id",
+            "homeTeam_teamId": "home_team_id",
+            "homeTeam_teamTricode": "home_team_tricode",
+            "awayTeam_teamId": "visitor_team_id",
+            "awayTeam_teamTricode": "visitor_team_tricode",
+            "gameDate": "game_date",
+            "gameStatus": "game_status",
+            "gameStatusText": "game_status_text"
+        })
 
-            # Flag if games are in the playoffs
-            games_df['is_playoffs'] = games_df['game_id'].str.startswith('004')
-            
-            # Flag if games are in the Regular Season 
-            games_df['is_regular_season'] = games_df['game_id'].str.startswith('002')
+        # Select and order columns
+        games_df = games_df[[
+            "game_id",
+            "is_regular_season",
+            "is_playoffs",
+            "game_date",
+            "home_team_id",
+            "home_team_tricode",
+            "visitor_team_id",
+            "visitor_team_tricode",
+            "game_status",
+            "game_status_text"
+        ]]
 
-            # Remove games not in regular season or playoffs
-            games_df = games_df[games_df['is_playoffs'] | games_df['is_regular_season']]
-
-            # Select and order columns
-            games_df = games_df[[
-                "game_id",
-                "is_regular_season",
-                "is_playoffs",
-                "playoffs_desc",
-                "game_date",
-                "home_team_id",
-                "home_team_tricode",
-                "visitor_team_id",
-                "visitor_team_tricode",
-                "game_status",
-                "game_status_text"
-            ]]
-
-            return games_df
+        return games_df
 
     @staticmethod
     def fetch_boxscore(game_id: str, proxy_arg) -> pd.DataFrame:
@@ -158,7 +139,7 @@ class AdvancedBoxscoreGames(metaclass=SingletonMeta):
             processed_game_ids: set = set()
         
         # Filter schedule to only ended games (status "3"
-        schedule_df = schedule_df[schedule_df["game_status"] == "3"]
+        schedule_df = schedule_df[schedule_df["game_status"].astype(str) == "3"]
 
         # Create List of Ended game IDs 
         game_id_list = schedule_df["game_id"].astype(str).tolist()
@@ -230,13 +211,15 @@ class AdvancedBoxscoreGames(metaclass=SingletonMeta):
             "PIE",
             "is_regular_season",
             "is_playoffs",
-            "playoffs_desc",
             "game_date",
             "home_team_id",
             "visitor_team_id",
             "game_status_text"
             ]
 
+        # Convert date to date without timezone info
+        new_boxscores_df['game_date'] = pd.to_datetime(new_boxscores_df['game_date']).dt.strftime('%Y-%m-%d')
+        
         # Combine with existing data if not none or empty 
         if existing_df is None:
             final_df: pd.DataFrame = new_boxscores_df

@@ -19,6 +19,7 @@ TeamsFileName: str = "nba_teams_df"
 FutureGamesFileName: str = "nba_future_games_df"
 PredictionsFileName: str = 'nba_points_predictions_df'
 ScheduleFileName: str = 'nba_schedule_df' 
+MetricsFileName: str = 'model_training_metrics_df'
 
 # Define the path to the databases folder.
 databases_path: str = "databases/"
