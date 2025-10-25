@@ -9,7 +9,8 @@ from src.get_nba_players import NbaPlayersData
 from src.get_nba_teams import NbaTeamsData
 from src.get_nba_schedule import ScheduleData
 from src.get_nba_advanced_boxscore import AdvancedBoxscoreGames
-from src.get_predictions_stats_points import PredictionsStatsPoints 
+from src.get_predictions_stats_points import PredictionsStatsPoints
+from src.train_model import ModelTrainer 
 from common.parser import build_parser
 
 
@@ -25,6 +26,7 @@ def main():
                                   "get_nba_schedule",
                                   "get_nba_boxscore_basic",  
                                   "get_nba_advanced_boxscore",
+                                  "train_model",
                                   "get_predictions_stats_points"]
     
     # Debugging: Print received process_name and valid processes
@@ -74,7 +76,14 @@ def main():
                                 proxy_user=os.getenv("NBA_PROXY_USER"),  
                                 proxy_pass=os.getenv("NBA_PROXY_PASS") 
                                 ).run()
-
+    
+    elif process_name == "train_model":
+        print(f"Running process: {process_name} with season: {current_season}")
+        ModelTrainer(           
+            model_path=model_path,
+            save_mode=save_mode
+        ).run()
+        
     elif process_name == "get_predictions_stats_points":
         print(f"Running process: {process_name} with date: {date} and model path:{model_path}")
         PredictionsStatsPoints( save_mode=save_mode,date=date,model_path=model_path).run()

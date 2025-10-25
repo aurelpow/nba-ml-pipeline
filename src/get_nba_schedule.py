@@ -79,7 +79,7 @@ class ScheduleData(metaclass=SingletonMeta):
             "homeTeam_teamTricode",
             "awayTeam_teamId",
             "awayTeam_teamTricode",
-            "nationalBroadcasters_broadcasterDisplay"
+            "nationalBroadcasters_0_broadcasterDisplay"
         ]
 
         # Filter the DataFrame with columns defined above 
