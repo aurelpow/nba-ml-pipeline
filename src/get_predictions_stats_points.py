@@ -386,6 +386,10 @@ class PredictionsStatsPoints(metaclass = SingletonMeta):
                 else:
                     raise AttributeError("Loaded model artifact is a dict without any object exposing a 'predict' method.")
 
+        # Reindex X_pred to match training columns (add missing with 0, drop extra)
+        feature_cols = model.get('feature_cols', X_pred.columns.tolist())
+        X_pred = X_pred.reindex(columns=feature_cols, fill_value=0)
+
         # Make predictions using the predictor
         predictions: np.ndarray = predictor.predict(X_pred)
 

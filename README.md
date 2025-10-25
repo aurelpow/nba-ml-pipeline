@@ -283,7 +283,6 @@ gcloud scheduler jobs create http nba-weekly-training \
 - **Author**: Aurelien Pow ([@aurelpow](https://github.com/aurelpow))
 
 ## 🛣️ Next Improvements and Features
-- **🔁 Automated Retraining**: Add a scheduled job to retrain the model weekly or monthly when performance degrades.
 - **➕ More stats** (AST / TOV / REB)
 - **🩺 Injury-aware predictions**
 - **🌐 API Service**: Expose predictions via a REST API (FastAPI/Flask) for real-time applications.

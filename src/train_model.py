@@ -9,11 +9,13 @@ robust to minor schema differences in the input tables.
 
 import logging 
 import os
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Tuple, Any
 import numpy as np
 import pandas as pd
 import joblib
 from datetime import datetime
+from google.cloud import storage
+import tempfile
 
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
@@ -43,6 +45,11 @@ class ModelTrainer:
         save_mode (str): mode for saving the model (local or cloud)
         """
         self.logger = logging.getLogger(__name__)
+        if not self.logger.handlers:
+            handler = logging.StreamHandler()
+            handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+            self.logger.addHandler(handler)
+        self.logger.setLevel(logging.INFO)
         self.model_path: str = model_path
         self.SAVE_MODE = save_mode
         self.feature_cols: List[str] = []
@@ -239,7 +246,7 @@ class ModelTrainer:
         raw_stats: dict = [k for k, v in key_stats.items() if 'raw' in v.lower()]
         engineering_stats: dict = [k for k, v in key_stats.items() if 'engineering' in v.lower()]
         
-        print(f"  Raw stats: {len(raw_stats)}, Engineering stats: {len(engineering_stats)}")
+        self.logger.info(f"  Raw stats: {len(raw_stats)}, Engineering stats: {len(engineering_stats)}")
         
         # 1) Add rolling features GROUPED BY WINDOW (matching notebook)
         for window in rolling_periods:
@@ -258,7 +265,7 @@ class ModelTrainer:
         for stat in engineering_stats:
             self.feature_cols.append(f"{stat}_per_poss")
         
-        print(f"Total numeric features: {len(self.feature_cols)}")
+        self.logger.info(f"Total numeric features: {len(self.feature_cols)}")
 
     def categorical_features(self, df: pd.DataFrame, categorical_cols: List[str]) -> pd.DataFrame:
         """
@@ -504,7 +511,7 @@ class ModelTrainer:
         # Clean data
         X_train: pd.DataFrame = X_train.replace([np.inf, -np.inf], np.nan).fillna(0)
         X_test: pd.DataFrame = X_test.replace([np.inf, -np.inf], np.nan).fillna(0)
-        
+
         # Step 3: Hyperparameter tuning (optional)
         if tune_params:
             best_params: dict = self._tune_hyperparameters(X_train, y_train, n_iter=n_iter)
@@ -615,8 +622,19 @@ class ModelTrainer:
             'training_date': datetime.now().isoformat()
         }
         
-        joblib.dump(artifact, filepath)
-        self.logger.info(f"✅ Model saved successfully")
+        if self.SAVE_MODE == "bq":
+            # Save to GCS bucket
+            bucket_name, blob_name = filepath.removeprefix("gs://").split("/", 1)
+            with tempfile.NamedTemporaryFile(suffix=".pkl") as tmp:
+                joblib.dump(artifact, tmp.name)
+                storage.Client().bucket(bucket_name).blob(blob_name).upload_from_filename(tmp.name)
+        elif self.SAVE_MODE == "local":
+            os.makedirs(os.path.dirname(filepath), exist_ok=True)
+            joblib.dump(artifact, filepath)
+        else:
+            raise ValueError(f"Unsupported SAVE_MODE: {self.SAVE_MODE}")
+        
+        self.logger.info("✅ Model saved successfully")
         self.logger.info(f"  Test R²: {metrics['test_r2']:.4f}")
         self.logger.info(f"  Test RMSE: {metrics['test_rmse']:.4f}")
 
