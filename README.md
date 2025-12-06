@@ -2,6 +2,7 @@
 
 *A complete, modular pipeline for fetching, processing, modeling, and predicting NBA player performance. 
 Whether you're exploring the data in a notebook or running daily inference in production, this repo has you covered.*
+Whether you're exploring the data in a notebook or running daily inference in production, this repo has you covered.*
 
 I built this because I love **basketball + data🏀📈**. 
 
@@ -195,7 +196,13 @@ NBA_project_ML/
 | `DAYS_NUMBER` | ❕ | `1` | Days ahead (default: 1) |
 | `SAVE_MODE` | ❕ | `local` \| `bq` | CSV vs BigQuery (default: local) |
 | `MODEL_PATH` | ❕ | `ml_dev/models/best_lgbm_model.pkl` \| `gs://…/model.pkl` | Local or GCS path |
+| `DATE` | ❕ | `2025-05-01` | Start date for inference (required for predictions) |
+| `DAYS_NUMBER` | ❕ | `1` | Days ahead (default: 1) |
+| `SAVE_MODE` | ❕ | `local` \| `bq` | CSV vs BigQuery (default: local) |
+| `MODEL_PATH` | ❕ | `ml_dev/models/best_lgbm_model.pkl` \| `gs://…/model.pkl` | Local or GCS path |
 | `HTTP_PROXY` / `HTTPS_PROXY` | ❕ | secret | Use in cloud to avoid API timeouts |
+
+> **Note**: If `MODEL_PATH` starts with `gs://`, the app downloads the file at runtime (see `common/io_utils.py::load_model()`).
 
 > **Note**: If `MODEL_PATH` starts with `gs://`, the app downloads the file at runtime (see `common/io_utils.py::load_model()`).
 
@@ -237,10 +244,26 @@ python -u main.py -p train_model -s 2024-25 -m "ml_dev/models/best_lgbm_model_v3
 ```
 
 **Generate predictions for specific date:**
+
+**Train a new model:**
+```bash
+python -u main.py -p train_model -s 2024-25 -m "ml_dev/models/best_lgbm_model_v3.pkl" -sm "local"
+# Runs full training pipeline with hyperparameter tuning
+# Output: trained model saved to specified path with metrics
+```
+
+**Generate predictions for specific date:**
 ```bash
 python -u main.py -p get_predictions_stats_points -s 2024-25 -d "2025-04-13" -m "ml_dev/models/best_lgbm_model.pkl" -sm "local"
 # -> ./databases/nba_points_predictions_df.csv
 ```
+
+**Parameters:**
+- `-p` process name (`train_model` | `get_predictions_stats_points` | `get_nba_players` | etc.)
+- `-s` season (e.g., `2024-25`)
+- `-d` date for predictions (format: `YYYY-MM-DD`)
+- `-m` model path (local or `gs://...`)
+- `-sm` save mode (`local` | `bq`)
 
 **Parameters:**
 - `-p` process name (`train_model` | `get_predictions_stats_points` | `get_nba_players` | etc.)
@@ -262,8 +285,23 @@ docker run --rm \
 ```
 
 **Generate predictions:**
+
+**Train model:**
 ```bash
 docker run --rm \
+  -e PROCESS="train_model" \
+  -e SEASON="2024-25" \
+  -e SAVE_MODE="local" \
+  -e MODEL_PATH="ml_dev/models/best_lgbm_model.pkl" \
+  nba_project_ml:latest
+```
+
+**Generate predictions:**
+```bash
+docker run --rm \
+  -e PROCESS="get_predictions_stats_points" \
+  -e SEASON="2024-25" \
+  -e SEASON_TYPE="Regular Season" \
   -e PROCESS="get_predictions_stats_points" \
   -e SEASON="2024-25" \
   -e SEASON_TYPE="Regular Season" \
@@ -273,6 +311,8 @@ docker run --rm \
   nba_project_ml:latest
 ```
 ### C) Cloud Run Job (BigQuery + proxy secret)
+
+**Setup:**
 
 **Setup:**
 ```bash
@@ -302,6 +342,20 @@ gcloud run jobs create nba-training-job \
 
 **Create Cloud Run Job for Predictions:**
 ```bash
+```
+
+**Create Cloud Run Job for Training:**
+```bash
+gcloud run jobs create nba-training-job \
+  --image "$IMAGE_URI" \
+  --region "$REGION" \
+  --set-env-vars=PROCESS=train_model,SEASON=2024-25,SAVE_MODE=bq,MODEL_PATH="${MODEL_PATH}" \
+  --set-secrets=HTTPS_PROXY=PROXY_URL:latest,HTTP_PROXY=PROXY_URL:latest \
+  --max-retries=1 --memory=2Gi --cpu=2 --task-timeout=3600s
+```
+
+**Create Cloud Run Job for Predictions:**
+```bash
 gcloud run jobs create nba-prediction-job \
   --image "$IMAGE_URI" \
   --region "$REGION" \
@@ -316,6 +370,28 @@ gcloud run jobs create nba-prediction-job \
 
 # Execute ad-hoc
 gcloud run jobs execute nba-prediction-job --region "$REGION"
+gcloud run jobs execute nba-training-job --region "$REGION"
+```
+
+**Scheduling (Cloud Scheduler):**
+```bash
+# Daily predictions at 10 AM EST
+gcloud scheduler jobs create http nba-daily-predictions \
+  --location="$REGION" \
+  --schedule="0 10 * * *" \
+  --time-zone="America/New_York" \
+  --uri="https://run.googleapis.com/v1/projects/$PROJECT_ID/locations/$REGION/jobs/nba-prediction-job:run" \
+  --http-method=POST \
+  --oauth-service-account-email="your-service-account@$PROJECT_ID.iam.gserviceaccount.com"
+
+# Weekly model retraining (Sunday at 2 AM)
+gcloud scheduler jobs create http nba-weekly-training \
+  --location="$REGION" \
+  --schedule="0 2 * * 0" \
+  --time-zone="America/New_York" \
+  --uri="https://run.googleapis.com/v1/projects/$PROJECT_ID/locations/$REGION/jobs/nba-training-job:run" \
+  --http-method=POST \
+  --oauth-service-account-email="your-service-account@$PROJECT_ID.iam.gserviceaccount.com"
 gcloud run jobs execute nba-training-job --region "$REGION"
 ```
 
