@@ -7,6 +7,12 @@ ml_dev/notebooks/InferenceModelFutureGames.ipynb
 ml_dev/img/
 ml_dev/models/
 
+# Temporary output files
+output.txt
+test_output.txt
+integration_test.log
+*.log
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

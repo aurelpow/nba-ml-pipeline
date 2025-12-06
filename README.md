@@ -10,38 +10,79 @@ I built this because I love **basketball + data🏀📈**.
 ## ✨ Recent Enhancements
 ![GitHub Release](https://img.shields.io/github/v/release/aurelpow/nba-ml-pipeline?color=blue&logo=github)
 
-**Production Training Pipeline (`train_model.py`):**
+**Production Training Pipeline (`src/training/`):**
 - Automated train/test split selection (15%/20%/25%) with time-series cross-validation
 - Hyperparameter tuning: `RandomizedSearchCV` with `TimeSeriesSplit` (20 iterations, 9 params)
-- Feature engineering: position groups, historical opponent stats, rolling windows (5/10/20 games), per-36/per-possession metrics
-- Complete artifact packaging: model + scaler + features + metrics
+- Feature engineering: position groups, historical opponent stats, rolling windows (3/7/15/30 games), per-36/per-possession metrics
+- Complete artifact packaging: model + features + metrics + best params
 
-**Inference Pipeline (`get_predictions_stats_points.py`):**
+**Fantasy Points Prediction (TTFL Formula 🌟):**
+- Dedicated pipeline for TrashTalk Fantasy League points (`src/training/train_fantasy_model.py`)
+- Custom TTFL target: PTS + REB + AST + STL + BLK + FGM + 3PM + FTM - TOV - Missed Shots
+- R² ~0.75 on training, ~0.63 on test set
+- Includes volatility metric for prediction confidence
+
+**Inference Pipeline (`src/predictors/`):**
 - Mirror-accurate feature engineering matching training pipeline
 - Handles missing data, new categories, DNPs gracefully
 - Supports local CSV and BigQuery persistence
+- Real-time predictions for upcoming games
 
 ---
+
+## 📁 Project Structure
+
+```
+nba-ml-pipeline/
+├── src/
+│   ├── data_collectors/      # Data ingestion from NBA API
+│   │   ├── get_nba_players.py
+│   │   ├── get_nba_teams.py
+│   │   ├── get_nba_schedule.py
+│   │   ├── get_nba_boxscore_basic.py
+│   │   └── get_nba_advanced_boxscore.py
+│   ├── training/              # Model training pipelines
+│   │   ├── train_model.py           # Points prediction training
+│   │   └── train_fantasy_model.py   # Fantasy points training
+│   ├── predictors/            # Prediction generators
+│   │   ├── get_predictions_stats_points.py
+│   │   └── get_predictions_fantasy_points.py
+│   └── targets/               # Target variable calculators
+│       └── fantasy_points.py
+├── common/                    # Shared utilities
+│   ├── feature_engineering.py  # Feature generation logic
+│   ├── model_utils.py          # Training & evaluation utilities
+│   ├── io_utils.py             # Data loading/saving
+│   ├── constants.py            # Configuration constants
+│   └── utils.py                # General helpers
+├── tests/                     # Unit & integration tests
+├── ml_dev/                    # Notebooks & experiments
+│   ├── notebooks/
+│   └── models/                # Saved model artifacts
+├── databases/                 # Local data storage
+├── main.py                    # CLI entry point
+└── README.md
+```
 
 ## 📥 Data Sources and Ingestion
 [swar/nba_api](https://github.com/swar/nba_api/)
 
    - **Players**: Retrieve active rosters via the NBA Stats API
       - Source : [swar/nba_api/stats/endpoints/playerindex](https://github.com/swar/nba_api/blob/master/src/nba_api/stats/endpoints/playerindex.py)
-      - Ingestion : [src/get_nba_players](src/get_nba_players.py)
+      - Ingestion : [src/data_collectors/get_nba_players.py](src/data_collectors/get_nba_players.py)
    - **Teams**: Retrieve team metadata via the NBA Stats API.
       - Source : [swar/nba_api/stats/static/teams](https://github.com/swar/nba_api/blob/master/src/nba_api/stats/static/teams.py)
-      - Ingestion : [src/get_nba_teams](src/get_nba_teams.py)
+      - Ingestion : [src/data_collectors/get_nba_teams.py](src/data_collectors/get_nba_teams.py)
    - **Boxscores**: Pull both basic and advanced boxscore statistics for every game.
       - **Basic Boxscore**: 
          - Source : [swar/nba_api/stats/endpoints/boxscoretraditionalv3](https://github.com/swar/nba_api/blob/master/src/nba_api/stats/endpoints/boxscoretraditionalv3.py)
-         - Ingestion : [src/get_nba_boxscore_basic](src/get_nba_boxscore_basic.py) 
+         - Ingestion : [src/data_collectors/get_nba_boxscore_basic.py](src/data_collectors/get_nba_boxscore_basic.py) 
       - **Advanced Boxscore**
          - Source : [swar/nba_api/stats/endpoints/boxscoreadvancedv3](https://github.com/swar/nba_api/blob/master/src/nba_api/stats/endpoints/boxscoreadvancedv3.py)
-         - Ingestion : [src/get_nba_advanced_boxscore](src/get_nba_advanced_boxscore.py) 
+         - Ingestion : [src/data_collectors/get_nba_advanced_boxscore.py](src/data_collectors/get_nba_advanced_boxscore.py) 
    - **Schedule**: Fetch all game schedules for a specific season.
       - Source [swar/nba_api/stats/endpoints/scheduleleaguev2](https://github.com/swar/nba_api/blob/master/src/nba_api/stats/endpoints/scheduleleaguev2.py)
-      - Ingestion : [src/get_nba_schedule.py](src/get_nba_schedule.py)
+      - Ingestion : [src/data_collectors/get_nba_schedule.py](src/data_collectors/get_nba_schedule.py)
 
 > 🔐 NBA API calls can use a private proxy ([DecoDO](https://dashboard.decodo.com/welcome)) via `HTTP_PROXY` / `HTTPS_PROXY`. — avoids timeouts  
 > In Cloud Run, mount these from **Secret Manager**.
@@ -55,31 +96,54 @@ I built this because I love **basketball + data🏀📈**.
   - Evaluation & tuning (metrics + plots)
   - Export artifact: `best_lgbm_model.pkl`
 
-### 🚀 Training Pipeline ([src/train_model.py](src/train_model.py))
-Automated production training with time-series cross-validation, hyperparameter tuning, and complete artifact packaging.
+- **Fantasy Model**: [docs/fantasy_points_model.md](docs/fantasy_points_model.md)
+  - Target: DraftKings Fantasy Points (PTS + 1.25*REB + 1.5*AST + ...)
+  - Notebook: [fantasy_points_eda.ipynb](ml_dev/notebooks/fantasy_points_eda.ipynb)
 
-**Usage:**
+### 🚀 Training Pipeline
+
+**Points Prediction** ([src/training/train_model.py](src/training/train_model.py))
 ```bash
-python -u main.py -p train_model -s 2024-25 -m "ml_dev/models/best_lgbm_model.pkl" -sm "local"
+python main.py --process train_model --season 2024-25 \
+  --model_path ml_dev/models/best_lgbm_model.pkl --save_mode local
 ```
+
+**Fantasy Points (TTFL)** ([src/training/train_fantasy_model.py](src/training/train_fantasy_model.py))
+```bash
+python main.py --process train_fantasy_model --save_mode local \
+  --model_path ml_dev/models/fantasy_model.pkl
+```
+
+**Features:**
+- Automated train/test split optimization (time-series aware)
+- Hyperparameter tuning with `RandomizedSearchCV`
+- Complete artifact packaging (model + features + metrics)
+- Best parameters saved for fast retraining
 
 ---
 ## 🧰 Inference Pipeline
 
-### ([src/get_predictions_stats_points.py](src/get_predictions_stats_points.py))
+### Points Prediction ([src/predictors/get_predictions_stats_points.py](src/predictors/get_predictions_stats_points.py))
 
 Generates player-game predictions with feature engineering matching the training pipeline exactly.
 
-**Workflow:**
-1. Load schedule for target date & expand to player-game rows
-2. Load model from local path or `gs://...` (auto-downloads)
-3. Build features: historical stats, rolling windows (5/10/20), per-36/per-possession metrics, categorical encoding
-4. Generate predictions & save to CSV or BigQuery
+**Usage:**
+```bash
+python main.py --process get_predictions_stats_points \
+  --date "2025-12-05" --model_path ml_dev/models/best_lgbm_model.pkl --save_mode local
+```
+
+### Fantasy Points ([src/predictors/get_predictions_fantasy_points.py](src/predictors/get_predictions_fantasy_points.py))
+
+Generates predictions for TrashTalk Fantasy League (TTFL) points with volatility metrics.
 
 **Usage:**
 ```bash
-python -u main.py -p get_predictions_stats_points -s 2024-25 -d "2025-04-13" -m "ml_dev/models/best_lgbm_model.pkl" -sm "local"
+python main.py --process get_predictions_fantasy_points \
+  --date "2025-12-05" --model_path ml_dev/models/fantasy_model.pkl --save_mode local
 ```
+
+**Output:** CSV with `predictedFantasyPoints` and `fantasyVolatility` (prediction confidence)
 
 ## 📁 Repository Structure
 
@@ -96,7 +160,9 @@ NBA_project_ML/
 │   ├── get_nba_advanced_boxscore.py
 │   ├── get_nba_schedule.py
 │   ├── get_predictions_stats_points.py
-│   └── train_model.py   
+│   ├── get_predictions_fantasy_points.py
+│   ├── train_model.py   
+│   └── train_fantasy_model.py
 ├── common/               # Shared utilities, parsers, and singletons
 │   ├── common.py
 │   ├── io_utils.py

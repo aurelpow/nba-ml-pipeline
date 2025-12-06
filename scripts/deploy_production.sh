@@ -1,0 +1,83 @@
+#!/bin/bash
+
+###############################################################################
+# 🚀 Deploy to Production Environment
+# Branch: main (production)
+# Purpose: Update Docker image in Artifact Registry for production
+###############################################################################
+
+set -e  # Exit on any error
+
+echo "=================================================="
+echo "🔧 DEPLOY TO PRODUCTION ENVIRONMENT"
+echo "=================================================="
+echo ""
+echo "⚠️  WARNING: This will deploy to PRODUCTION!"
+echo ""
+read -p "Are you sure you want to continue? (yes/no): " confirm
+
+if [ "$confirm" != "yes" ]; then
+    echo "❌ Deployment cancelled"
+    exit 0
+fi
+
+# 🔄 1. Sync with GitHub
+echo "📥 Step 1: Syncing with GitHub..."
+cd ~/nba_project_ML || { echo "❌ Directory not found!"; exit 1; }
+
+git fetch origin
+git reset --hard origin/main
+
+echo "✅ Code synced with main branch"
+echo ""
+
+# 🧩 2. Define variables for PRODUCTION environment
+echo "🧩 Step 2: Setting up environment variables..."
+
+export PROJECT_ID="ml-nba-project"
+export REGION="us-central1"
+export REPO="nba-docker-repo"
+export IMAGE="nba_project"
+export ENVIRONMENT="production"
+
+# Build image URI with latest tag
+export IMAGE_URI="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO}/${IMAGE}"
+
+echo "   📦 Project: ${PROJECT_ID}"
+echo "   🌍 Region: ${REGION}"
+echo "   📂 Repository: ${REPO}"
+echo "   🏷️  Image: ${IMAGE}"
+echo "   🔖 Tag: latest"
+echo "   🎯 Full URI: ${IMAGE_URI}:latest"
+echo ""
+
+# 🔐 3. Authenticate Docker (if needed)
+echo "🔐 Step 3: Checking Docker authentication..."
+gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+
+echo "✅ Docker authenticated"
+echo ""
+
+# 🚀 4. Build and push to Artifact Registry with 'latest' tag
+echo "🚀 Step 4: Building and pushing image..."
+echo "   ⏳ This may take several minutes..."
+echo ""
+
+gcloud builds submit \
+  --tag "${IMAGE_URI}:latest" \
+  --project "${PROJECT_ID}" \
+  --timeout=20m
+
+echo ""
+echo "=================================================="
+echo "✅ PRODUCTION DEPLOYMENT COMPLETE!"
+echo "=================================================="
+echo ""
+echo "📋 Deployment Summary:"
+echo "   • Environment: PRODUCTION"
+echo "   • Branch: main"
+echo "   • Image: ${IMAGE_URI}:latest"
+echo ""
+echo "🔍 To verify your image:"
+echo "   gcloud artifacts docker images list ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO} --filter='package=${IMAGE}'"
+echo ""
