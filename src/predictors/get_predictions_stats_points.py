@@ -23,7 +23,6 @@ class PredictionsStatsPoints(metaclass = SingletonMeta):
         Initialize the NBA player statistics data object.
             Args:
                 date (datetime.date): The date to start fetching stats from. Format: YYYY-MM-DD.
-                days_number (int): The number of days to fetch stats for.
                 save_mode (str): The mode to save data, either 'local' or 'bq' (google bigquery). 
         """
         self.date: datetime.date = datetime.datetime.strptime(date, "%Y-%m-%d").date()

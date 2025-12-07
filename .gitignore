@@ -13,6 +13,9 @@ test_output.txt
 integration_test.log
 *.log
 
+# GCP Configuration (contains secrets)
+scripts/gcp_config.sh
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -198,4 +201,4 @@ cython_debug/
 # Project Structure 
 #  - This is a project structure file that is used to define the structure of the project
 #  - It is not meant to be committed to the repository
-project-structure.txt 
+project-structure.txt

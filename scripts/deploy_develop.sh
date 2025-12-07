@@ -8,6 +8,10 @@
 
 set -e  # Exit on any error
 
+# Load GCP configuration
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/gcp_config.sh"
+
 echo "=================================================="
 echo "🔧 DEPLOY TO DEVELOP ENVIRONMENT"
 echo "=================================================="
@@ -15,32 +19,24 @@ echo ""
 
 # 🔄 1. Sync with GitHub
 echo "📥 Step 1: Syncing with GitHub..."
-cd ~/nba_project_ML || { echo "❌ Directory not found!"; exit 1; }
+echo "   • Branch: ${DEV_BRANCH}"
+echo "   • Directory: ${PROJECT_DIR}"
+cd "${PROJECT_DIR}" || { echo "❌ Directory not found: ${PROJECT_DIR}"; exit 1; }
 
 git fetch origin
-git reset --hard origin/feature/fantsay-points-prediction
+git reset --hard "origin/${DEV_BRANCH}"
 
 echo "✅ Code synced with remote branch"
 echo ""
 
-# 🧩 2. Define variables for DEVELOP environment
-echo "🧩 Step 2: Setting up environment variables..."
-
-export PROJECT_ID="ml-nba-project"
-export REGION="us-central1"
-export REPO="nba-docker-repo"
-export IMAGE="nba_project"
-export ENVIRONMENT="develop"  # Develop environment marker
-
-# Build image URI with develop tag
-export IMAGE_URI="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO}/${IMAGE}"
-
+# 🧩 2. Display environment variables
+echo "🧩 Step 2: Using environment configuration..."
 echo "   📦 Project: ${PROJECT_ID}"
 echo "   🌍 Region: ${REGION}"
-echo "   📂 Repository: ${REPO}"
-echo "   🏷️  Image: ${IMAGE}"
-echo "   🔖 Tag: develop"
-echo "   🎯 Full URI: ${IMAGE_URI}:develop"
+echo "   📂 Repository: ${REPO_NAME}"
+echo "   🏷️  Image: ${IMAGE_NAME}"
+echo "   🔖 Tag: ${DEV_IMAGE_TAG}"
+echo "   🎯 Full URI: ${DEV_IMAGE_URI}"
 echo ""
 
 # 🔐 3. Authenticate Docker (if needed)
@@ -56,7 +52,7 @@ echo "   ⏳ This may take several minutes..."
 echo ""
 
 gcloud builds submit \
-  --tag "${IMAGE_URI}:develop" \
+  --tag "${DEV_IMAGE_URI}" \
   --project "${PROJECT_ID}" \
   --timeout=20m
 
@@ -67,11 +63,11 @@ echo "=================================================="
 echo ""
 echo "📋 Deployment Summary:"
 echo "   • Environment: DEVELOP"
-echo "   • Branch: feature/fantsay-points-prediction"
-echo "   • Image: ${IMAGE_URI}:develop"
+echo "   • Branch: ${DEV_BRANCH}"
+echo "   • Image: ${DEV_IMAGE_URI}"
 echo ""
 echo "🔍 To verify your image:"
-echo "   gcloud artifacts docker images list ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO} --filter='package=${IMAGE}'"
+echo "   gcloud artifacts docker images list ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME} --filter='package=${IMAGE_NAME}'"
 echo ""
 echo "🚀 Next steps:"
 echo "   1. Test the image in develop environment"

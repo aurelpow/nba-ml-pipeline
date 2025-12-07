@@ -31,7 +31,7 @@ trap 'echo "[ERROR $(ts)] Failed at line $LINENO"; exit 1' ERR
 
 # ---- main ----
 
-log "▶️ Running all processes for season=$SEASON, date=$DATE (days=$DAYS_NUMBER, season_type=$SEASON_TYPE, save_mode=$SAVE_MODE)"
+log "▶️ Running all processes for season=$SEASON, date=$DATE (season_type=$SEASON_TYPE, save_mode=$SAVE_MODE)"
 
 log "➡️ Running get_nba_players..."
 python main.py -p get_nba_players -s "$SEASON" -sm "$SAVE_MODE"
@@ -53,9 +53,9 @@ log "➡️ Running get_nba_advanced_boxscore..."
 python main.py -p get_nba_advanced_boxscore -s "$SEASON" -st "$SEASON_TYPE" -sm "$SAVE_MODE"
 log "✅ Finished get_nba_advanced_boxscore"
 
-log "➡️ Running train_model..."
-python main.py -p train_model -sm "$SAVE_MODE" -m "$MODEL_PATH"
-log "✅ Finished train_model"
+log "➡️ Running train..."
+python main.py -p train -sm "$SAVE_MODE" -m "$MODEL_PATH"
+log "✅ Finished train"
 
 log "➡️ Running get_predictions_stats_points..."
 python main.py -p get_predictions_stats_points -sm "$SAVE_MODE" -d "$DATE" -m "$MODEL_PATH"

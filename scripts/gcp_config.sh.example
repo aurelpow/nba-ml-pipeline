@@ -1,0 +1,128 @@
+###############################################################################
+# ⚙️  Google Cloud Platform Configuration - EXAMPLE
+# 
+# 📝 This is a TEMPLATE file with placeholder values
+# 
+# TO USE:
+# 1. Copy this file: cp gcp_config.sh.example gcp_config.sh
+# 2. Edit gcp_config.sh and replace ALL placeholder values below
+# 3. Your actual gcp_config.sh will NOT be committed (it's in .gitignore)
+#
+# 💡 TIP: Search for "your-" to find all placeholders you need to replace
+#
+# ⚠️  SECURITY: Never commit gcp_config.sh with real credentials!
+#
+###############################################################################
+
+# 🌐 Google Cloud Project Settings
+# Find your project ID: gcloud config get-value project
+export PROJECT_ID="your-project-id"              # REPLACE: e.g., "ml-nba-project"
+export REGION="us-central1"                      # REPLACE: e.g., "us-central1", "europe-west1"
+
+# 🪣 Cloud Storage Settings
+# Your Cloud Storage bucket (create one if needed: gsutil mb gs://bucket-name)
+export BUCKET_NAME="your-bucket-name"            # REPLACE: e.g., "ml-nba-project_cloudbuild"
+export MODELS_FOLDER="models_trained"            # KEEP THIS: folder inside bucket for models
+
+# 🔐 Service Account
+# Find your service account: gcloud iam service-accounts list
+export SERVICE_ACCOUNT="your-service-account@your-project-id.iam.gserviceaccount.com"
+# REPLACE: e.g., "nba-cloud-run-sa@ml-nba-project.iam.gserviceaccount.com"
+
+# 🔑 Secret Manager - Proxy Credentials
+# Secret names in Google Secret Manager (not the actual values!)
+export NBA_PROXY_USER_SECRET="NBA_PROXY_USER"    # KEEP THIS: name of secret in Secret Manager
+export NBA_PROXY_PASS_SECRET="NBA_PROXY_PASS"    # KEEP THIS: name of secret in Secret Manager
+
+# 🐳 Artifact Registry Settings
+# Your Docker repository in Artifact Registry
+export REPO_NAME="your-docker-repo"              # REPLACE: e.g., "nba-docker-repo"
+export IMAGE_NAME="nba_project"                  # KEEP THIS: Docker image name
+
+# 📦 Model Paths (in Cloud Storage)
+# ✅ These are auto-computed from BUCKET_NAME and MODELS_FOLDER - no changes needed
+export PROD_POINTS_MODEL="gs://${BUCKET_NAME}/${MODELS_FOLDER}/prod/points_model.pkl"
+export PROD_FANTASY_MODEL="gs://${BUCKET_NAME}/${MODELS_FOLDER}/prod/fantasy_points_model.pkl"
+export DEV_POINTS_MODEL="gs://${BUCKET_NAME}/${MODELS_FOLDER}/develop/points_model.pkl"
+export DEV_FANTASY_MODEL="gs://${BUCKET_NAME}/${MODELS_FOLDER}/develop/fantasy_points_model.pkl"
+
+# 🏷️  Image Tags
+# ✅ Usually keep these as-is
+export PROD_IMAGE_TAG="latest"
+export DEV_IMAGE_TAG="develop"
+
+# 💻 Compute Resources
+# ✅ Adjust if you need more/less resources for training
+export MEMORY="4Gi"                              # Options: "2Gi", "4Gi", "8Gi"
+export CPU="2"                                   # Options: "1", "2", "4"
+export TIMEOUT="3600s"                           # Max job duration (1 hour)
+export MAX_RETRIES="1"                           # Number of retries on failure
+
+# 🔢 NBA Data Settings
+# ✅ Adjust based on your training needs
+export SEASON="2025-26"                          # NBA season to train on
+export SEASON_TYPE="Regular Season"              # "Regular Season" or "Playoffs"
+
+# 🎯 Training Settings
+export TARGETS="points fantasy_points"   # Targets to train (space separated)
+export TUNE_PARAMS="false"               # Enable hyperparameter tuning (true/false)
+
+# 🔑 Secret Manager Settings
+# Names of your secrets in Google Secret Manager
+export NBA_PROXY_USER_SECRET="nba-proxy-user"
+export NBA_PROXY_PASS_SECRET="nba-proxy-pass"
+
+# 📁 Git & Project Settings
+export PROJECT_DIR="$HOME/nba_project_ML"        # REPLACE: Use $HOME or absolute path
+export DEV_BRANCH="develop"                      # REPLACE: your development branch name
+export PROD_BRANCH="main"                        # KEEP THIS: production branch name
+
+###############################################################################
+# 🛠️  Derived Variables (DO NOT EDIT - Automatically computed)
+###############################################################################
+
+# Full image URIs
+export PROD_IMAGE_URI="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/${IMAGE_NAME}:${PROD_IMAGE_TAG}"
+export DEV_IMAGE_URI="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/${IMAGE_NAME}:${DEV_IMAGE_TAG}"
+
+# Base storage path
+export STORAGE_BASE="gs://${BUCKET_NAME}/${MODELS_FOLDER}"
+
+###############################################################################
+# 📋 Configuration Summary Display
+###############################################################################
+
+if [ "$1" = "--show" ]; then
+    echo "=================================================="
+    echo "⚙️  GCP CONFIGURATION"
+    echo "=================================================="
+    echo ""
+    echo "🌐 Project Settings:"
+    echo "   • Project ID: ${PROJECT_ID}"
+    echo "   • Region: ${REGION}"
+    echo ""
+    echo "🪣 Storage:"
+    echo "   • Bucket: ${BUCKET_NAME}"
+    echo "   • Models Folder: ${MODELS_FOLDER}"
+    echo ""
+    echo "📦 Production Models:"
+    echo "   • Points: ${PROD_POINTS_MODEL}"
+    echo "   • Fantasy: ${PROD_FANTASY_MODEL}"
+    echo ""
+    echo "📦 Development Models:"
+    echo "   • Points: ${DEV_POINTS_MODEL}"
+    echo "   • Fantasy: ${DEV_FANTASY_MODEL}"
+    echo ""
+    echo "🐳 Container Images:"
+    echo "   • Production: ${PROD_IMAGE_URI}"
+    echo "   • Development: ${DEV_IMAGE_URI}"
+    echo ""
+    echo "🔐 Service Account:"
+    echo "   ${SERVICE_ACCOUNT}"
+    echo ""
+    echo "💻 Compute Resources:"
+    echo "   • Memory: ${MEMORY}"
+    echo "   • CPU: ${CPU}"
+    echo "   • Timeout: ${TIMEOUT}"
+    echo ""
+fi

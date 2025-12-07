@@ -17,7 +17,14 @@ def build_parser(parser:argparse.ArgumentParser):
     parser.add_argument("-st","--season_type", type=str, default=None, help="Type of season to run the process for")
     parser.add_argument("-d","--date", type=str, default=None, help="Date to run the process for (optional)")
     parser.add_argument("-m","--model_path", type=str, default=None, help="Path to the model for predictions (optional)")
-    parser.add_argument("-t","--target", type=str, default="points", choices=["points", "fantasy_points"], help="Target variable for training")
+    parser.add_argument(
+        "-t", "--target",
+        nargs="+",
+        type=lambda s: "fantasy_points" if s in ("fantasy", "fantasy_points") else s,
+        default=["points"],
+        choices=["points", "fantasy_points"],
+        help="Target variable(s) for training (one or more of: 'points', 'fantasy'/'fantasy_points')"
+    )
     parser.add_argument("--tune_params", type=str, default="false", choices=["true", "false"], help="Enable hyperparameter tuning during training (true/false)")
     
     # Get the arguments from the parser

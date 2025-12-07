@@ -193,11 +193,6 @@ NBA_project_ML/
 | `SEASON` | ✅ | `2024-25` | Target season |
 | `SEASON_TYPE` | ❕ | `Regular Season` | Default: Regular Season |
 | `DATE` | ❕ | `2025-05-01` | Start date for inference (required for predictions) |
-| `DAYS_NUMBER` | ❕ | `1` | Days ahead (default: 1) |
-| `SAVE_MODE` | ❕ | `local` \| `bq` | CSV vs BigQuery (default: local) |
-| `MODEL_PATH` | ❕ | `ml_dev/models/best_lgbm_model.pkl` \| `gs://…/model.pkl` | Local or GCS path |
-| `DATE` | ❕ | `2025-05-01` | Start date for inference (required for predictions) |
-| `DAYS_NUMBER` | ❕ | `1` | Days ahead (default: 1) |
 | `SAVE_MODE` | ❕ | `local` \| `bq` | CSV vs BigQuery (default: local) |
 | `MODEL_PATH` | ❕ | `ml_dev/models/best_lgbm_model.pkl` \| `gs://…/model.pkl` | Local or GCS path |
 | `HTTP_PROXY` / `HTTPS_PROXY` | ❕ | secret | Use in cloud to avoid API timeouts |
@@ -359,13 +354,13 @@ gcloud run jobs create nba-training-job \
 gcloud run jobs create nba-prediction-job \
   --image "$IMAGE_URI" \
   --region "$REGION" \
-  --set-env-vars=SEASON=2024-25,SEASON_TYPE="Regular Season",DATE=2025-05-01,DAYS_NUMBER=1,SAVE_MODE=bq,MODEL_PATH="${MODEL_PATH}" \
+  --set-env-vars=SEASON=2024-25,SEASON_TYPE="Regular Season",DATE=2025-05-01,SAVE_MODE=bq,MODEL_PATH="${MODEL_PATH}" \
   --set-secrets=HTTPS_PROXY=PROXY_URL:latest,HTTP_PROXY=PROXY_URL:latest \
   --max-retries=1 --memory=1Gi --cpu=1 --task-timeout=1800s \
 || gcloud run jobs update nba-prediction-job \
   --image "$IMAGE_URI" \
   --region "$REGION" \
-  --set-env-vars=SEASON=2024-25,SEASON_TYPE="Regular Season",DATE=2025-05-01,DAYS_NUMBER=1,SAVE_MODE=bq,MODEL_PATH="${MODEL_PATH}" \
+  --set-env-vars=SEASON=2024-25,SEASON_TYPE="Regular Season",DATE=2025-05-01,SAVE_MODE=bq,MODEL_PATH="${MODEL_PATH}" \
   --set-secrets=HTTPS_PROXY=PROXY_URL:latest,HTTP_PROXY=PROXY_URL:latest
 
 # Execute ad-hoc
@@ -429,3 +424,74 @@ gcloud scheduler jobs create http nba-weekly-training \
 - **🩺 Injury-aware predictions**
 - **🌐 API Service**: Expose predictions via a REST API (FastAPI/Flask) for real-time applications.
 - **📊 Dashboard**: Build an interactive dashboard (Plotly Dash or Power BI) to visualize predictions and model performance.
+
+## 🚀 Quick Start
+
+### 1. Configure Google Cloud Platform
+
+Before deploying, you need to configure your GCP settings. The repository includes an example configuration file.
+
+#### Create Your Configuration File
+
+```bash
+# Copy the example file
+cp scripts/gcp_config.sh.example scripts/gcp_config.sh
+
+# Edit with your GCP information
+nano scripts/gcp_config.sh
+```
+
+#### Update These Values
+
+Open `scripts/gcp_config.sh` and replace the placeholders:
+
+| Placeholder | Your Value | Description |
+|-------------|------------|-------------|
+| `your-project-id` | `ml-nba-project` | Your GCP project ID |
+| `your-bucket-name` | `ml-nba-project_cloudbuild` | Your Cloud Storage bucket |
+| `your-service-account@...` | `nba-cloud-run-sa@ml-nba-project.iam.gserviceaccount.com` | Your service account email |
+| `your-docker-repo` | `nba-docker-repo` | Your Artifact Registry repository |
+
+**Example:**
+```bash
+# Before (example file)
+export PROJECT_ID="your-project-id"
+
+# After (your config)
+export PROJECT_ID="ml-nba-project"
+```
+
+**⚠️ Security Note:**
+- `gcp_config.sh` is in `.gitignore` - your credentials stay private
+- `gcp_config.sh.example` contains only placeholders - safe to share
+- Never commit real credentials to version control!
+
+#### Alternative: Interactive Setup
+
+```bash
+./scripts/setup_gcp_config.sh
+```
+
+This wizard will prompt for each value and create the config file for you.
+
+### 2. Deploy to Cloud Run
+
+```bash
+# For development
+./scripts/deploy_develop.sh
+
+# For production
+./scripts/deploy_production.sh
+```
+
+### 3. Create and Run Jobs
+
+```bash
+# Create job
+./scripts/create_cloud_run_job_develop.sh fantasy_points false
+
+# Run job
+./scripts/run_cloud_job_develop.sh fantasy_points
+```
+
+📚 **See [Cloud Setup Quickstart](docs/CLOUD_SETUP_QUICKSTART.md) for detailed instructions**

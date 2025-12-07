@@ -76,12 +76,13 @@ def main():
                                 ).run()
     
     elif process_name == "train":
-        print(f"Running process: {process_name} for target: {target} (tune_params={tune_params})")
-        UnifiedModelTrainer(
-            target=target,
-            model_path=model_path,
-            save_mode=save_mode
-        ).run(tune_params=tune_params)
+        for tgt in target:
+                print(f"Running process: {process_name} for target: {tgt} (tune_params={tune_params})")
+                UnifiedModelTrainer(
+                    target=tgt,
+                    model_path=model_path,
+                    save_mode=save_mode
+                ).run(tune_params=tune_params)
         
     elif process_name == "get_predictions_stats_points":
         print(f"Running process: {process_name} with date: {date} and model path:{model_path}")
