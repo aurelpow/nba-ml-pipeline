@@ -17,7 +17,7 @@ BoxscoreFileName: str = "nba_boxscore_basic"
 PlayersFileName: str = "nba_players_df"
 TeamsFileName: str = "nba_teams_df"
 FutureGamesFileName: str = "nba_future_games_df"
-PredictionsFileName: str = 'nba_points_predictions_df'
+PredictionsFileName: str = 'nba_predictions_df'
 ScheduleFileName: str = 'nba_schedule_df' 
 MetricsFileName: str = 'model_training_metrics_df'
 
@@ -61,6 +61,64 @@ def _delete_rows_by_game_id(client: bigquery.Client, table_id: str, game_ids: It
     )
     job.result()
     return getattr(job, "num_dml_affected_rows", 0) or 0
+
+
+def _delete_predictions_by_composite_key(
+    client: bigquery.Client, 
+    table_id: str, 
+    df: pd.DataFrame
+) -> int:
+    """
+    Delete existing predictions matching gameId + personId + Measure combination.
+    This prevents duplicates when re-running predictions for the same games.
+    """
+    if df.empty:
+        return 0
+    
+    # Check if table exists
+    try:
+        client.get_table(table_id)
+    except NotFound:
+        print(f"Table {table_id} not found, skipping deletion")
+        return 0
+    
+    # Build composite keys from new predictions
+    required_cols = ['gameId', 'personId', 'Measure']
+    if not all(col in df.columns for col in required_cols):
+        print(f"⚠️ Missing required columns for deletion: {required_cols}")
+        return 0
+    
+    # Create a temporary table with the keys to delete
+    keys_df = df[required_cols].drop_duplicates()
+    keys_df = keys_df.astype({'gameId': str, 'personId': str, 'Measure': int})
+    
+    temp_table_id = f"{table_id}_delete_keys_temp"
+    
+    # Upload keys to temp table
+    job_config = bigquery.LoadJobConfig(
+        write_disposition="WRITE_TRUNCATE",
+        autodetect=True
+    )
+    client.load_table_from_dataframe(keys_df, temp_table_id, job_config=job_config).result()
+    
+    # Delete matching rows using JOIN
+    query = f"""
+    DELETE FROM `{table_id}` AS target
+    WHERE EXISTS (
+        SELECT 1 FROM `{temp_table_id}` AS keys
+        WHERE target.gameId = keys.gameId
+          AND target.personId = keys.personId
+          AND target.Measure = keys.Measure
+    )
+    """
+    job = client.query(query)
+    job.result()
+    
+    # Clean up temp table
+    client.delete_table(temp_table_id, not_found_ok=True)
+    
+    deleted_count = getattr(job, "num_dml_affected_rows", 0) or 0
+    return deleted_count
 
 
 def save_database(
@@ -123,6 +181,91 @@ def save_database(
     print(f"✅ Saved {len(df):,} row(s) to {table_id} "
           f"({'APPEND after delete-by-key' if has_game_id else load_config.write_disposition})")
 
+
+def save_predictions(
+    df: pd.DataFrame,
+    table_name: str,
+    mode: str = "bq"
+) -> None:
+    """
+    Save predictions with intelligent append logic.
+    Deletes existing predictions for the same gameId + personId + Measure combination
+    before appending new predictions. Works in both local and BigQuery modes.
+    
+    Args:
+        df (pd.DataFrame): Predictions DataFrame with columns: gameId, personId, Measure, Predictions, etc.
+        table_name (str): Table name (e.g., 'nba_predictions_df')
+        mode (str): 'local' or 'bq'
+    """
+    if df is None or df.empty:
+        print("⚠️ Predictions DataFrame empty; nothing to save.")
+        return
+    
+    # Add audit timestamp
+    df["aud_modification_date"] = pd.Timestamp.now(tz="Europe/Madrid")
+    
+    if mode == "local":
+        # Local mode: load existing, filter out duplicates, append new
+        path = f"databases/{table_name}.csv"
+        
+        if os.path.exists(path):
+            existing_df = pd.read_csv(path, low_memory=False)
+            
+            # Remove existing predictions for same gameId + personId + Measure
+            if not existing_df.empty and all(col in existing_df.columns for col in ['gameId', 'personId', 'Measure']):
+                # Create composite key for filtering
+                new_keys = df[['gameId', 'personId', 'Measure']].astype(str).agg('_'.join, axis=1)
+                existing_keys = existing_df[['gameId', 'personId', 'Measure']].astype(str).agg('_'.join, axis=1)
+                
+                # Keep only rows from existing that don't match new predictions
+                mask = ~existing_keys.isin(new_keys)
+                filtered_existing = existing_df[mask]
+                
+                deleted_count = len(existing_df) - len(filtered_existing)
+                print(f"🧹 Removed {deleted_count} existing predictions for {len(new_keys.unique())} game-player-measure combinations.")
+                
+                # Concatenate filtered existing with new
+                final_df = pd.concat([filtered_existing, df], ignore_index=True)
+            else:
+                # No existing data or missing columns
+                final_df = df
+        else:
+            # No existing file
+            final_df = df
+        
+        final_df.to_csv(path, index=False)
+        print(f"✅ Saved {len(df):,} new prediction(s) to {path} (Total: {len(final_df):,} rows)")
+        return
+    
+    if mode != "bq":
+        raise ValueError("Invalid mode: choose 'local' or 'bq'")
+    
+    # BigQuery mode
+    client = bigquery.Client()
+    table_id = _table_ref(table_name)
+    
+    # Delete existing predictions for same composite keys
+    deleted = _delete_predictions_by_composite_key(client, table_id, df)
+    print(f"🧹 Deleted {deleted} existing predictions for {len(df)} new prediction(s).")
+    
+    # Append new predictions
+    load_config = bigquery.LoadJobConfig(
+        write_disposition="WRITE_APPEND",
+        autodetect=True
+    )
+    
+    job = client.load_table_from_dataframe(df, table_id, job_config=load_config)
+    try:
+        job.result()
+    except BadRequest as e:
+        print(f"❌ BigQuery load failed: {e}")
+        for err in getattr(job, "errors", []) or []:
+            print(f" - {err.get('message')}")
+        raise
+    
+    print(f"✅ Saved {len(df):,} prediction(s) to {table_id} (APPEND after delete-by-composite-key)")
+
+
 def load_data(FileName: str, mode: str ) -> pd.DataFrame:
     """
     Load data either locally or to BigQuery, depending on mode
@@ -157,37 +300,3 @@ def _parse_gcs_uri(uri: str) -> tuple[str, str]:
     if not m:
         raise ValueError(f"Invalid GCS URI: {uri}")
     return m.group(1), m.group(2)
-
-def load_model_artifact(model_path: str, mode: str):
-    """
-    Load a model artifact from either local disk or GCS.
-
-    Args:
-        model_path: local path or 'gs://bucket/obj'
-        mode: 'local' or 'bq' (if 'bq' and path is gs://, downloads from GCS)
-
-    Returns:
-        The deserialized model (e.g., a LightGBM/Sklearn object via joblib)
-    """
-    mode = (mode or "").lower()
-    is_gcs = isinstance(model_path, str) and model_path.startswith("gs://")
-
-    # Local mode (or any non-gs path) -> direct load
-    if mode == "local" or not is_gcs:
-        return joblib.load(model_path)
-
-    # GCS mode: download to a temp file then load
-    bucket_name, blob_name = _parse_gcs_uri(model_path)
-    client = storage.Client()  # uses default creds on Cloud Run Job
-    blob = client.bucket(bucket_name).blob(blob_name)
-
-    with tempfile.NamedTemporaryFile(suffix=".pkl", delete=False) as tmp:
-        tmp_path = tmp.name
-    try:
-        blob.download_to_filename(tmp_path)
-        return joblib.load(tmp_path)
-    finally:
-        try:
-            os.remove(tmp_path)
-        except OSError:
-            pass

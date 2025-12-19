@@ -6,6 +6,8 @@ set -euo pipefail
 : "${SEASON_TYPE:=Regular Season}"      # default to Regular Season
 : "${SAVE_MODE:=bq}"                    # default to BigQuery
 : "${MODEL_PATH:=ml_dev/models/best_lgbm_model_v2.pkl}"
+: "${TARGET:=points}"                  # default to points only
+: "${TUNE_HYPERPARAMETERS:=false}"      # default to no tuning
 
 # Optional proxy creds (exported if present)
 : "${NBA_PROXY_USER:=}"
@@ -54,11 +56,16 @@ python main.py -p get_nba_advanced_boxscore -s "$SEASON" -st "$SEASON_TYPE" -sm 
 log "✅ Finished get_nba_advanced_boxscore"
 
 log "➡️ Running train..."
-python main.py -p train -sm "$SAVE_MODE" -m "$MODEL_PATH"
+# Convert space-separated targets to individual arguments
+python main.py -p train -sm "$SAVE_MODE" -m "$MODEL_PATH" -t $TARGET --tune_params "$TUNE_HYPERPARAMETERS"
 log "✅ Finished train"
 
 log "➡️ Running get_predictions_stats_points..."
 python main.py -p get_predictions_stats_points -sm "$SAVE_MODE" -d "$DATE" -m "$MODEL_PATH"
 log "✅ Finished get_predictions_stats_points"
+
+log "➡️ Running get_predictions_fantasy_points..."
+python main.py -p get_predictions_fantasy_points -sm "$SAVE_MODE" -d "$DATE" -m "$MODEL_PATH"
+log "✅ Finished get_predictions_fantasy_points"
 
 log "✅ All processes completed.✅"

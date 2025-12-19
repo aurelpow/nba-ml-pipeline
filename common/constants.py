@@ -69,3 +69,33 @@ categorical_cols_fantasy: list[str] = [
 target_variable_fantasy: str = 'fantasy_points'
 # Rolling windows for fantasy ML models
 rolling_windows_fantasy: list[int] = [3, 7, 15, 30]
+rolling_windows_points: list[int] = [5, 10, 20]
+
+# Measure types for predictions output (narrow format)
+MEASURE_PREDICTED_POINTS: int = 1
+MEASURE_PREDICTED_FANTASY_POINTS: int = 2
+MEASURE_POINTS_VOLATILITY: int = 3
+MEASURE_FANTASY_VOLATILITY: int = 4
+
+# Target configuration - centralized settings for each target variable
+# To add a new target, simply add a new entry to this dictionary
+TARGET_CONFIGS: dict[str, dict] = {
+    'points': {
+        'key_stats': key_stats_points,
+        'categorical_cols': categorical_cols_points,
+        'target_variable': target_variable_points,
+        'rolling_windows': rolling_windows_points,
+        'measure_prediction': MEASURE_PREDICTED_POINTS,
+        'measure_volatility': MEASURE_POINTS_VOLATILITY,
+        'target_computer_fn': None  # No computation needed, already in data
+    },
+    'fantasy_points': {
+        'key_stats': key_stats_fantasy,
+        'categorical_cols': categorical_cols_fantasy,
+        'target_variable': target_variable_fantasy,
+        'rolling_windows': rolling_windows_fantasy,
+        'measure_prediction': MEASURE_PREDICTED_FANTASY_POINTS,
+        'measure_volatility': MEASURE_FANTASY_VOLATILITY,
+        'target_computer_fn': 'compute_fantasy_points'  # String reference to avoid circular import
+    }
+}

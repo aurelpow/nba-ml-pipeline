@@ -87,7 +87,7 @@ def transform_data(
     
     # 4. Encode Categoricals
     logger.info("Encoding categorical features...")
-    df, encoded_cols, _ = encode_categorical_features(df, categorical_cols)
+    df, encoded_cols = encode_categorical_features(df, categorical_cols)
     
     # 5. Define Feature Columns
     feature_cols = get_feature_cols(key_stats, rolling_periods=rolling_windows)

@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import datetime
 from typing import List, Dict, Tuple, Any
 from sklearn.preprocessing import OneHotEncoder
 from common.utils import parse_minutes
@@ -231,7 +232,7 @@ def compute_rolling_stats(df: pd.DataFrame, key_stats: Dict[str, str], windows: 
 
     return df
 
-def encode_categorical_features(df: pd.DataFrame, categorical_cols: List[str]) -> Tuple[pd.DataFrame, List[str], OneHotEncoder]:
+def encode_categorical_features(df: pd.DataFrame, categorical_cols: List[str]) -> Tuple[pd.DataFrame, List[str]]:
     """
     Encode categorical features using one-hot encoding.
     
@@ -246,20 +247,20 @@ def encode_categorical_features(df: pd.DataFrame, categorical_cols: List[str]) -
             - Fitted encoder
     """
     # encode categorical features
-    encoder = OneHotEncoder(sparse_output=False, handle_unknown='ignore')
-    encoded_categorical = encoder.fit_transform(df[categorical_cols])
+    encoder: OneHotEncoder = OneHotEncoder(sparse_output=False, handle_unknown='ignore')
+    encoded_categorical: np.ndarray = encoder.fit_transform(df[categorical_cols])
     
-    feature_names = encoder.get_feature_names_out(categorical_cols).tolist()
+    feature_names: Any = encoder.get_feature_names_out(categorical_cols).tolist()
 
     # Drop original categorical columns
     df = df.drop(categorical_cols, axis=1)
 
     # Concatenate encoded columns to original dataframe
-    final_df = pd.concat([df, pd.DataFrame(encoded_categorical, 
+    final_df: pd.DataFrame = pd.concat([df, pd.DataFrame(encoded_categorical, 
                                            columns=feature_names, 
                                            index=df.index)], axis=1)
     
-    return final_df, feature_names, encoder
+    return final_df, feature_names
 
 def get_feature_cols(key_stats: Dict[str, str], rolling_periods: List[int] = [5, 10, 20]) -> List[str]:
     """
@@ -298,5 +299,185 @@ def get_feature_cols(key_stats: Dict[str, str], rolling_periods: List[int] = [5,
     
     for stat in engineering_stats:
         feature_cols.append(f"{stat}_per_poss")
-        
+
+    # Add rest_days as a feature
+    feature_cols.append('rest_days')
+
     return feature_cols
+
+def get_rest_days(players_df: pd.DataFrame,
+                  boxscore_df: pd.DataFrame,
+                  date: datetime.date) -> pd.DataFrame:
+    """
+    Calculate rest days for each players up to a given date.
+    Args:
+        df (pd.DataFrame): input DataFrame
+    Returns:
+        pd.DataFrame: DataFrame with rest_days column added
+    """
+
+    # Get unique players 
+    players_unique: pd.DataFrame = players_df[['person_id', 'team_id']].drop_duplicates()
+
+    # Get last game date for each player
+    last_games: pd.DataFrame = (
+        boxscore_df[pd.to_datetime(boxscore_df['game_date']).dt.date  < date]
+        .sort_values('game_date')
+        .groupby('personId')
+        .tail(1)[['personId', 'game_date']]
+        .rename(columns={'game_date': 'last_game_date'})
+    )
+
+    # Merge to get last game date per player
+    rest_days_df: pd.DataFrame = players_unique.merge(
+        last_games,
+        left_on='person_id',
+        right_on='personId',
+        how='left'
+    )
+
+    # Calculate rest days
+    rest_days_df['rest_days'] = (pd.to_datetime(date) - pd.to_datetime(rest_days_df['last_game_date'])).dt.days
+    rest_days_df['rest_days'] = rest_days_df['rest_days'].fillna(7)  # Default to 7 days if no last game
+    
+    return rest_days_df[['personId', 'rest_days']]
+
+def get_volatility(df_historical: pd.DataFrame, 
+                           target_variable: str) -> pd.DataFrame:
+    """
+    Calculate fantasy points volatility (std dev over last 20 games).
+    Args:
+        df_historical (pd.DataFrame): input DataFrame
+        target_variable (str): target variable for volatility calculation
+    Returns:
+        pd.DataFrame: DataFrame with personId and fantasy_volatility columns
+    """
+    
+    # Calculate volatility (std dev of fantasy points over last 10 games)
+    # We need to do this on the full history before taking the tail
+    df_hist_sorted: pd.DataFrame = df_historical.sort_values(['personId', 'game_date'])
+    df_hist_sorted['fantasy_volatility'] = df_hist_sorted.groupby('personId')[target_variable].transform(
+            lambda x: x.rolling(20, min_periods=5).std()
+        )
+    
+    # Get latest volatility values
+    volatility_df: pd.DataFrame = (
+        df_hist_sorted.sort_values('game_date')
+        .groupby('personId')
+        .tail(1)[['personId', 'fantasy_volatility']]
+    )
+
+    return volatility_df
+    
+def get_final_df(
+             encoded_df: pd.DataFrame, 
+             volatility_df: pd.DataFrame,
+             future_games: pd.DataFrame,
+             model: Any,
+             feature_names: List[str],
+             encoded_feature_names: List[str],
+             measure_prediction: int,
+             measure_volatility: int) -> pd.DataFrame:
+    """
+    Prepare final DataFrame for prediction.
+    Args:
+        encoded_df (pd.DataFrame): DataFrame with encoded historical data
+        volatility_df (pd.DataFrame): DataFrame with volatility data
+        future_games (pd.DataFrame): DataFrame with future games data
+        model (Any): Trained model for prediction
+        feature_names (List[str]): List of feature names to select
+        encoded_feature_names (List[str]): List of encoded feature names to select
+        measure_prediction (int): Measure code for predictions (e.g., MEASURE_PREDICTED_POINTS)
+        measure_volatility (int): Measure code for volatility (e.g., MEASURE_POINTS_VOLATILITY)
+    Returns:
+        pd.DataFrame: Final DataFrame ready for prediction.
+    """
+    # Get final feature names (including encoded)
+    final_features: List[str] = feature_names + encoded_feature_names
+
+    # Get latest stats
+    latest_stats: pd.DataFrame = encoded_df.sort_values('game_date').groupby('personId').tail(1)
+    
+    # Merge volatility into latest stats
+    latest_stats: pd.DataFrame = latest_stats.merge(
+        volatility_df,
+        on='personId',
+        how='left'
+    )
+    # Merge 
+    cols_to_merge: list[str] = [c for c in final_features if c in latest_stats.columns]
+    cols_to_merge.append('personId')
+    cols_to_merge.append('fantasy_volatility')
+    
+    # Also add rest_days if it exists in latest_stats (but not in final_features list)
+    if 'rest_days' in latest_stats.columns and 'rest_days' not in cols_to_merge:
+        cols_to_merge.append('rest_days')
+
+    # Select only relevant features
+    future_games_long: pd.DataFrame = future_games.merge(
+        latest_stats[cols_to_merge],
+        left_on='person_id',
+        right_on='personId',
+        how='inner'
+    )
+
+    # Predict - check for rest_days and add it if needed
+    available_features = [f for f in final_features if f in future_games_long.columns]
+    
+    # If rest_days is in final_features but not in future_games_long, add it
+    if 'rest_days' in final_features and 'rest_days' not in future_games_long.columns:
+        # This shouldn't happen if we merged correctly above, but as a fallback
+        future_games_long['rest_days'] = 3  # default value
+    
+    X_pred: pd.DataFrame = future_games_long[final_features].fillna(0)
+    # DEBUG: Compare with model's expected features
+    if hasattr(model, 'feature_name_'):
+        model_features = model.feature_name_
+        print(f"\n🔍 Feature comparison:")
+        print(f"   Model expects: {len(model_features)} features")
+        print(f"   We have: {len(X_pred.columns)} features")
+        
+        # Find missing and extra features
+        missing = set(model_features) - set(X_pred.columns)
+        extra = set(X_pred.columns) - set(model_features)
+        
+        if missing:
+            print(f"\n❌ MISSING features (in model but not in X_pred):")
+            for feat in sorted(missing):
+                print(f"   - {feat}")
+        
+        if extra:
+            print(f"\n➕ EXTRA features (in X_pred but not in model):")
+            for feat in sorted(extra):
+                print(f"   - {feat}")
+        
+        # Reorder X_pred to match model's expected feature order
+        X_pred = X_pred.reindex(columns=model_features, fill_value=0)
+        print(f"\n✅ Reordered X_pred to match model features")
+    
+    predictions: Any = model.predict(X_pred)
+    
+    # Create base DataFrame
+    base_df = pd.DataFrame({
+        'gameId': future_games_long['gameId'].values,
+        'gameDate': future_games_long['gameDate'].values,
+        'teamId': future_games_long['team_id'].values,
+        'opponentId': future_games_long['opponent'].values,
+        'personId': future_games_long['personId'].values,
+        'player_slug': future_games_long['player_slug'].values,
+    })
+    
+    # Create predictions rows (narrow format)
+    predictions_rows = base_df.copy()
+    predictions_rows['Measure'] = measure_prediction
+    predictions_rows['Predictions'] = np.round(predictions, 1)
+    
+    # Create volatility rows (narrow format)
+    volatility_rows = base_df.copy()
+    volatility_rows['Measure'] = measure_volatility
+    volatility_rows['Predictions'] = np.round(future_games_long['fantasy_volatility'].fillna(0), 1)
+    
+    # Combine both measures
+    predictions_df = pd.concat([predictions_rows, volatility_rows], ignore_index=True)
+    
+    return predictions_df

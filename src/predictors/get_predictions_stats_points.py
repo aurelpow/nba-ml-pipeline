@@ -9,27 +9,30 @@ from common.singleton_meta import SingletonMeta
 from common.io_utils import (BoxscoreFileName, AdvancedBoxscoreFileName, 
                           PlayersFileName, ScheduleFileName,
                           PredictionsFileName, save_database,
-                          load_model_artifact, load_data)
+                           load_data)
+from common.model_utils import load_model_artifact
 from common.utils import extract_season, parse_minutes
-from common.constants import key_stats_points, categorical_cols_points
+from common.constants import key_stats_points, categorical_cols_points, rolling_windows_points
 
 class PredictionsStatsPoints(metaclass = SingletonMeta):
     """
     A class to fetch and update NBA player statistics for points predictions.
     """
 
-    def __init__(self, save_mode: str,  date: datetime.date, model_path: str) -> None:
+    def __init__(self, save_mode: str,  date: datetime.date, model_path: str,
+                 target: str) -> None:
         """
         Initialize the NBA player statistics data object.
             Args:
-                date (datetime.date): The date to start fetching stats from. Format: YYYY-MM-DD.
                 save_mode (str): The mode to save data, either 'local' or 'bq' (google bigquery). 
+                date (datetime.date): The date to start fetching stats from. Format: YYYY-MM-DD.
+                model_path (str): The path to the trained model for predictions.
+                target (str): The target variable for predictions ('points').
         """
         self.date: datetime.date = datetime.datetime.strptime(date, "%Y-%m-%d").date()
         self.model_path: str = model_path
         self.SAVE_MODE: str = save_mode
-
-    
+        self.target: str = target
 
     def read_data(self) -> Dict[str, pd.DataFrame]:
         """
@@ -93,7 +96,6 @@ class PredictionsStatsPoints(metaclass = SingletonMeta):
                                                                             else 'C' if x in ('C', 'C-F') 
                                                                             else x 
                                                                             )
-        
 
         # Add categorical features like is_home and season 
         specific_games_df['is_home']= specific_games_df['team_id'] == specific_games_df['homeTeam_teamId']
@@ -250,7 +252,7 @@ class PredictionsStatsPoints(metaclass = SingletonMeta):
             df[ppp] = df[stat] / df['possessions']
 
         # Rolling the per-36 and per-possession metrics
-        rolling_periods: list = [5, 10, 20]
+        rolling_periods: list = rolling_windows_points
 
         # Filter out engineering stats (only normalize raw stats)
         feature_cols_rolling: list[str] = [k for k, v in key_stats_points.items() if 'engineering' not in v.lower()]
@@ -392,15 +394,19 @@ class PredictionsStatsPoints(metaclass = SingletonMeta):
         # Make predictions using the predictor
         predictions: np.ndarray = predictor.predict(X_pred)
 
-        # Create a DataFrame with predictions
+        # Import measure constants
+        from common.constants import MEASURE_PREDICTED_POINTS
+        
+        # Create a DataFrame with predictions in narrow format
         predictions_df = pd.DataFrame({
             'gameId': future_games_df['gameId'].values,
             'gameDate': future_games_df['gameDate'].values,
             'teamId': future_games_df['team_id'].values,
             'opponentId': future_games_df['opponent'].values,
             'personId': future_games_df['person_id'].values,
-            'fullName': future_games_df['player_slug'].values,
-            'predictedPoints': predictions
+            'player_slug': future_games_df['player_slug'].values,
+            'Measure': MEASURE_PREDICTED_POINTS,
+            'Predictions': np.round(predictions, 1)
         })
         
         return predictions_df
@@ -444,19 +450,25 @@ class PredictionsStatsPoints(metaclass = SingletonMeta):
             pd.DataFrame: A DataFrame with player statistics ready for predictions.
         """
         # Load the model
-        model: Any = load_model_artifact(self.model_path, mode=self.SAVE_MODE)
+        model: Any = load_model_artifact(model_path=self.model_path,
+                                         target=self.target,
+                                         mode=self.SAVE_MODE
+                                         )
         
         # Load the data
         data_map: dict = self.read_data()
         
         # Transform the data
-        future_games_long_df, X_pred_df = self.transform_data(data_map)
+        future_games_long_df, X_pred_df = self.transform_data(data_map=data_map)
         
         # Get predictions
-        predictions_df: pd.DataFrame = self.get_predictions(future_games_long_df, X_pred_df, model)
+        predictions_df: pd.DataFrame = self.get_predictions(future_games_df=future_games_long_df,
+                                                            X_pred_df=X_pred_df, 
+                                                            model=model)
 
         # Save the predictions to a CSV file
-        save_database(predictions_df,PredictionsFileName, 
+        save_database(df=predictions_df, 
+                      file_name=PredictionsFileName, 
                       mode=self.SAVE_MODE,
                       write_disposition="WRITE_APPEND")
         
