@@ -89,15 +89,22 @@ def _delete_predictions_by_composite_key(
         return 0
     
     # Create a temporary table with the keys to delete
+    # Match BigQuery schema: gameId=STRING, personId=INTEGER, Measure=INTEGER
     keys_df = df[required_cols].drop_duplicates()
-    keys_df = keys_df.astype({'gameId': str, 'personId': str, 'Measure': int})
+    keys_df['gameId'] = keys_df['gameId'].astype(str)
+    keys_df['personId'] = keys_df['personId'].astype('Int64')  # Nullable integer
+    keys_df['Measure'] = keys_df['Measure'].astype('Int64')
     
     temp_table_id = f"{table_id}_delete_keys_temp"
     
-    # Upload keys to temp table
+    # Upload keys to temp table with explicit schema matching target table
     job_config = bigquery.LoadJobConfig(
         write_disposition="WRITE_TRUNCATE",
-        autodetect=True
+        schema=[
+            bigquery.SchemaField("gameId", "STRING"),
+            bigquery.SchemaField("personId", "INTEGER"),
+            bigquery.SchemaField("Measure", "INTEGER"),
+        ]
     )
     client.load_table_from_dataframe(keys_df, temp_table_id, job_config=job_config).result()
     
