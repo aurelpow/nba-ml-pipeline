@@ -24,44 +24,54 @@ $$
 
 ## 🛠️ Training Pipeline
 
-The training pipeline is defined in `src/train_fantasy_model.py`.
+The training pipeline uses the unified trainer in `src/training/train.py` (class: `UnifiedModelTrainer`).
 
 **Steps:**
 1.  **Load Data**: Fetches Boxscores, Advanced Stats, and Player info.
 2.  **Preprocessing**: Merges data, handles missing values, parses minutes.
-3.  **Target Calculation**: Computes the `fantasy_points` column.
+3.  **Target Calculation**: Computes the `fantasy_points` column using `src/targets/fantasy_points.py`.
 4.  **Feature Engineering**:
     - Creates historical features (time-aware).
     - Normalizes stats (per 36 min, per 100 poss).
     - Computes rolling averages.
     - Encodes categorical variables (Position, Team, etc.).
 5.  **Split**: Time-based train/test split (auto-selected for best performance).
-6.  **Tuning**: RandomizedSearchCV with TimeSeriesSplit.
+6.  **Tuning**: RandomizedSearchCV with TimeSeriesSplit (optional).
 7.  **Training**: Fits the final LightGBM model.
 8.  **Evaluation**: Computes RMSE, MAE, R².
-9.  **Saving**: Saves the model artifact (model, scaler, metadata) to disk or GCS.
+9.  **Saving**: Saves the model artifact (model + metadata) to disk or GCS.
 
 **Usage:**
 ```bash
-python main.py -p train_fantasy_model -s 2024-25 -m "ml_dev/models/fantasy_model.pkl" -sm "local"
+# Fast training (no tuning)
+python main.py -p train -t fantasy_points -m "ml_dev/models/fantasy_points_model.pkl" -sm "local"
+
+# With hyperparameter tuning
+python main.py -p train -t fantasy_points -m "ml_dev/models/" -sm "local" --tune_params true
 ```
 
 ## 🔮 Inference Pipeline
 
-The inference pipeline is defined in `src/get_predictions_fantasy_points.py`.
+The inference pipeline uses the unified predictor in `src/predictors/unified_predictor.py` (class: `UnifiedPredictor`).
 
 **Steps:**
 1.  **Load Schedule**: Gets games for the target date.
-2.  **Load Model**: Loads the trained artifact.
+2.  **Load Model**: Loads the trained artifact from local or GCS.
 3.  **Feature Construction**: Recreates the exact features used in training for the target players.
     - *Crucial*: Uses the same historical windows and normalization logic.
-4.  **Prediction**: Generates point estimates.
-5.  **Output**: Saves predictions to CSV or BigQuery.
+4.  **Prediction**: Generates point estimates and volatility metrics.
+5.  **Output**: Saves predictions in narrow format (Measure + Predictions columns) to CSV or BigQuery.
+    - Intelligent append logic prevents duplicates when re-running same dates
 
 **Usage:**
 ```bash
-python main.py -p get_predictions_fantasy_points -s 2024-25 -d "2025-04-13" -m "ml_dev/models/fantasy_model.pkl" -sm "local"
+python main.py -p get_predictions_fantasy_points -d "2025-04-13" -m "ml_dev/models/fantasy_points_model.pkl" -sm "local"
 ```
+
+**Output Format:**
+- `Measure`: 2 (fantasy predictions) or 4 (fantasy volatility)
+- `Predictions`: Numeric prediction value
+- Other columns: gameId, gameDate, teamId, opponentId, personId, player_slug
 
 ## 📊 EDA & Analysis
 
