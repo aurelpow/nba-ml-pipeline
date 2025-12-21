@@ -6,11 +6,24 @@ set -euo pipefail
 : "${SEASON_TYPE:=Regular Season}"      # default to Regular Season
 : "${SAVE_MODE:=bq}"                    # default to BigQuery
 : "${MODEL_PATH:=ml_dev/models/best_lgbm_model_v2.pkl}"
+: "${TARGET:=points}"                  # default to points only
+: "${TUNE_HYPERPARAMETERS:=false}"      # default to no tuning
 
 # Optional proxy creds (exported if present)
 : "${NBA_PROXY_USER:=}"
 : "${NBA_PROXY_PASS:=}"
 export NBA_PROXY_USER NBA_PROXY_PASS PYTHONUNBUFFERED=1
+
+# If DATE not provided, use "today" in Europe/Madrid
+if [ -z "${DATE:-}" ]; then
+  DATE="$(python - <<'PY'
+from datetime import datetime
+from zoneinfo import ZoneInfo
+z = ZoneInfo("Europe/Madrid")
+print(datetime.now(z).date().isoformat())
+PY
+)"
+fi
 
 # If DATE not provided, use "today" in Europe/Madrid
 if [ -z "${DATE:-}" ]; then
@@ -31,7 +44,7 @@ trap 'echo "[ERROR $(ts)] Failed at line $LINENO"; exit 1' ERR
 
 # ---- main ----
 
-log "▶️ Running all processes for season=$SEASON, date=$DATE (days=$DAYS_NUMBER, season_type=$SEASON_TYPE, save_mode=$SAVE_MODE)"
+log "▶️ Running all processes for season=$SEASON, date=$DATE (season_type=$SEASON_TYPE, save_mode=$SAVE_MODE)"
 
 log "➡️ Running get_nba_players..."
 python main.py -p get_nba_players -s "$SEASON" -sm "$SAVE_MODE"
@@ -53,12 +66,17 @@ log "➡️ Running get_nba_advanced_boxscore..."
 python main.py -p get_nba_advanced_boxscore -s "$SEASON" -st "$SEASON_TYPE" -sm "$SAVE_MODE"
 log "✅ Finished get_nba_advanced_boxscore"
 
-log "➡️ Running train_model..."
-python main.py -p train_model -sm "$SAVE_MODE" -m "$MODEL_PATH"
-log "✅ Finished train_model"
+log "➡️ Running train..."
+# Convert space-separated targets to individual arguments
+python main.py -p train -sm "$SAVE_MODE" -m "$MODEL_PATH" -t $TARGET --tune_params "$TUNE_HYPERPARAMETERS"
+log "✅ Finished train"
 
 log "➡️ Running get_predictions_stats_points..."
 python main.py -p get_predictions_stats_points -sm "$SAVE_MODE" -d "$DATE" -m "$MODEL_PATH"
 log "✅ Finished get_predictions_stats_points"
+
+log "➡️ Running get_predictions_fantasy_points..."
+python main.py -p get_predictions_fantasy_points -sm "$SAVE_MODE" -d "$DATE" -m "$MODEL_PATH"
+log "✅ Finished get_predictions_fantasy_points"
 
 log "✅ All processes completed.✅"

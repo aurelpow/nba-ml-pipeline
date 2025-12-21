@@ -4,13 +4,13 @@ import os
 import logging
 import sys
 
-from src.get_nba_boxscore_basic import BoxscoreGames
-from src.get_nba_players import NbaPlayersData
-from src.get_nba_teams import NbaTeamsData
-from src.get_nba_schedule import ScheduleData
-from src.get_nba_advanced_boxscore import AdvancedBoxscoreGames
-from src.get_predictions_stats_points import PredictionsStatsPoints
-from src.train_model import ModelTrainer 
+from src.data_collectors.get_nba_boxscore_basic import BoxscoreGames
+from src.data_collectors.get_nba_players import NbaPlayersData
+from src.data_collectors.get_nba_teams import NbaTeamsData
+from src.data_collectors.get_nba_schedule import ScheduleData
+from src.data_collectors.get_nba_advanced_boxscore import AdvancedBoxscoreGames
+from src.predictors.unified_predictor import UnifiedPredictor
+from src.training.train import UnifiedModelTrainer
 from common.parser import build_parser
 
 
@@ -19,19 +19,16 @@ def main():
 
     parser:argparse.ArgumentParser = argparse.ArgumentParser(description="NBA Stats Data Pipeline")
 
-    process_name, current_season,save_mode,season_type, date, model_path = build_parser(parser)
+    process_name, current_season, save_mode, season_type, date, model_path, target, tune_params = build_parser(parser)
 
     valid_processes: list[str] = ["get_nba_players",
                                   "get_nba_teams", 
                                   "get_nba_schedule",
                                   "get_nba_boxscore_basic",  
                                   "get_nba_advanced_boxscore",
-                                  "train_model",
-                                  "get_predictions_stats_points"]
-    
-    # Debugging: Print received process_name and valid processes
-    print(f"Received process_name: {process_name}")
-    print(f"Valid processes: {valid_processes}")
+                                  "train",
+                                  "get_predictions_stats_points",
+                                  "get_predictions_fantasy_points"]
 
     # Strip whitespace and check for validity
     process_name = process_name.strip()
@@ -77,16 +74,22 @@ def main():
                                 proxy_pass=os.getenv("NBA_PROXY_PASS") 
                                 ).run()
     
-    elif process_name == "train_model":
-        print(f"Running process: {process_name} with season: {current_season}")
-        ModelTrainer(           
-            model_path=model_path,
-            save_mode=save_mode
-        ).run()
+    elif process_name == "train":
+        for tgt in target:
+                print(f"Running process: {process_name} for target: {tgt} (tune_params={tune_params})")
+                UnifiedModelTrainer(
+                    target=tgt,
+                    model_path=model_path,
+                    save_mode=save_mode
+                ).run(tune_params=tune_params)
         
     elif process_name == "get_predictions_stats_points":
         print(f"Running process: {process_name} with date: {date} and model path:{model_path}")
-        PredictionsStatsPoints( save_mode=save_mode,date=date,model_path=model_path).run()
+        UnifiedPredictor(target='points', save_mode=save_mode, date=date, model_path=model_path).run()
+
+    elif process_name == "get_predictions_fantasy_points":
+        print(f"Running process: {process_name} with date: {date} and model path:{model_path}")
+        UnifiedPredictor(target='fantasy_points', save_mode=save_mode, date=date, model_path=model_path).run()
         
     # print the time taken to run the process    
     print(f"Process {process_name} completed in {datetime.today() - time_start}.")

@@ -1,0 +1,95 @@
+#!/bin/bash
+
+###############################################################################
+# 🚀 Create Cloud Run Job - Develop Environment
+# Purpose: Create a job to train BOTH models (points + fantasy_points)
+#
+# Usage:
+#   ./scripts/create_cloud_run_job_develop.sh [tune_params]
+#
+# Examples:
+#   ./scripts/create_cloud_run_job_develop.sh false  # Quick training without tuning
+#   ./scripts/create_cloud_run_job_develop.sh true   # Full hyperparameter tuning
+###############################################################################
+
+set -e  # Exit on any error
+
+# Load GCP configuration
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/gcp_config.sh"
+
+# Parse arguments (override config if provided)
+TUNE_PARAMS="${1:-${TUNE_PARAMS:-false}}"
+
+# Job name
+JOB_NAME="nba-training-develop"
+
+# Define targets and model directory
+# We pass the directory so UnifiedModelTrainer can save {target}_model.pkl inside it
+TARGETS="${TARGETS:-points fantasy_points}"
+MODEL_DIR="gs://${BUCKET_NAME}/${MODELS_FOLDER}/develop"
+
+echo "=================================================="
+echo "🔧 CREATE CLOUD RUN JOB - DEVELOP"
+echo "=================================================="
+echo ""
+echo "📦 Job Configuration:"
+echo "   • Name: ${JOB_NAME}"
+echo "   • Targets: ${TARGETS}"
+echo "   • Model Dir: ${MODEL_DIR}"
+echo "   • Tune Params: ${TUNE_PARAMS}"
+echo "   • Region: ${REGION}"
+echo "   • Image: ${DEV_IMAGE_URI}"
+echo "   • Service Account: ${SERVICE_ACCOUNT}"
+echo ""
+
+# 🗑️ Delete existing job if it exists
+echo "🔍 Checking for existing job..."
+if gcloud run jobs describe "${JOB_NAME}" --region="${REGION}" --project="${PROJECT_ID}" &>/dev/null; then
+    echo "⚠️  Job '${JOB_NAME}' already exists. Deleting..."
+    gcloud run jobs delete "${JOB_NAME}" \
+        --region="${REGION}" \
+        --project="${PROJECT_ID}" \
+        --quiet
+    echo "✅ Existing job deleted"
+else
+    echo "✅ No existing job found"
+fi
+echo ""
+
+# 🚀 Create Cloud Run Job
+echo "📦 Creating Cloud Run Job: ${JOB_NAME}..."
+
+# Ensure secrets are defined (default to standard names if missing in config)
+NBA_PROXY_USER_SECRET="${NBA_PROXY_USER_SECRET:-nba-proxy-user}"
+NBA_PROXY_PASS_SECRET="${NBA_PROXY_PASS_SECRET:-nba-proxy-pass}"
+
+gcloud run jobs create ${JOB_NAME} \
+  --image=${DEV_IMAGE_URI} \
+  --region=${REGION} \
+  --service-account=${SERVICE_ACCOUNT} \
+  --memory=${MEMORY} \
+  --cpu=${CPU} \
+  --task-timeout=${TIMEOUT} \
+  --max-retries=${MAX_RETRIES} \
+  --set-env-vars="SEASON=${SEASON},SEASON_TYPE=${SEASON_TYPE},SAVE_MODE=bq,TARGET=${TARGETS},MODEL_PATH=${MODEL_DIR},TUNE_HYPERPARAMETERS=${TUNE_PARAMS}" \
+  --set-secrets="NBA_PROXY_USER=${NBA_PROXY_USER_SECRET}:latest,NBA_PROXY_PASS=${NBA_PROXY_PASS_SECRET}:latest"
+
+echo ""
+echo "=================================================="
+echo "✅ CLOUD RUN JOB CREATED!"
+echo "=================================================="
+echo ""
+echo "📋 Job Summary:"
+echo "   • Job Name: ${JOB_NAME}"
+echo "   • Environment: DEVELOP"
+echo "   • Trains: Points + Fantasy Points"
+echo "   • Tuning: ${TUNE_PARAMS}"
+echo "   • Season: ${SEASON} (${SEASON_TYPE})"
+echo ""
+echo "🚀 Execute job:"
+echo "   ./scripts/run_cloud_job_develop.sh"
+echo ""
+echo "🔍 Monitor job execution:"
+echo "   gcloud run jobs executions list --job=${JOB_NAME} --region=${REGION}"
+echo ""
