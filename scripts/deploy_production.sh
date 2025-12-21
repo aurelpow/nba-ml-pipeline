@@ -8,6 +8,10 @@
 
 set -e  # Exit on any error
 
+# Load GCP configuration
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/gcp_config.sh"
+
 echo "=================================================="
 echo "🔧 DEPLOY TO PRODUCTION ENVIRONMENT"
 echo "=================================================="
