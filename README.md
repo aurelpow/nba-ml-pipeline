@@ -26,6 +26,8 @@ I built this because I love **basketball + data🏀📈**.
 
 **Fantasy Points Prediction (TTFL Formula 🌟):**
 - Custom TTFL target: PTS + REB + AST + STL + BLK + FGM + 3PM + FTM - TOV - Missed Shots
+- TTFL website : https://fantasy.trashtalk.co/ 
+- Notebook: `ml_dev/notebooks/fantasy_points_eda.ipynb`
 - R² ~0.75 on training, ~0.63 on test set
 - Includes volatility metric for prediction confidence
 
