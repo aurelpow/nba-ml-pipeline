@@ -23,10 +23,12 @@ fi
 
 # 🔄 1. Sync with GitHub
 echo "📥 Step 1: Syncing with GitHub..."
-cd ~/nba_project_ML || { echo "❌ Directory not found!"; exit 1; }
+echo "   • Branch: ${PROD_BRANCH}"
+echo "   • Directory: ${PROJECT_DIR}"
+cd "${PROJECT_DIR}" || { echo "❌ Directory not found: ${PROJECT_DIR}"; exit 1; }
 
 git fetch origin
-git reset --hard origin/main
+git reset --hard "origin/${PROD_BRANCH}"
 
 echo "✅ Code synced with main branch"
 echo ""
@@ -75,8 +77,8 @@ echo "=================================================="
 echo ""
 echo "📋 Deployment Summary:"
 echo "   • Environment: PRODUCTION"
-echo "   • Branch: main"
-echo "   • Image: ${IMAGE_URI}:latest"
+echo "   • Branch: ${PROD_BRANCH}"
+echo "   • Image: ${PROD_IMAGE_URI}"
 echo ""
 echo "🔍 To verify your image:"
 echo "   gcloud artifacts docker images list ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO} --filter='package=${IMAGE}'"

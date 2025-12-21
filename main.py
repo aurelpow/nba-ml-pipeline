@@ -9,8 +9,7 @@ from src.data_collectors.get_nba_players import NbaPlayersData
 from src.data_collectors.get_nba_teams import NbaTeamsData
 from src.data_collectors.get_nba_schedule import ScheduleData
 from src.data_collectors.get_nba_advanced_boxscore import AdvancedBoxscoreGames
-from src.predictors.get_predictions_stats_points import PredictionsStatsPoints
-from src.predictors.get_predictions_fantasy_points import PredictionsFantasyPoints
+from src.predictors.unified_predictor import UnifiedPredictor
 from src.training.train import UnifiedModelTrainer
 from common.parser import build_parser
 
@@ -76,20 +75,21 @@ def main():
                                 ).run()
     
     elif process_name == "train":
-        print(f"Running process: {process_name} for target: {target} (tune_params={tune_params})")
-        UnifiedModelTrainer(
-            target=target,
-            model_path=model_path,
-            save_mode=save_mode
-        ).run(tune_params=tune_params)
+        for tgt in target:
+                print(f"Running process: {process_name} for target: {tgt} (tune_params={tune_params})")
+                UnifiedModelTrainer(
+                    target=tgt,
+                    model_path=model_path,
+                    save_mode=save_mode
+                ).run(tune_params=tune_params)
         
     elif process_name == "get_predictions_stats_points":
         print(f"Running process: {process_name} with date: {date} and model path:{model_path}")
-        PredictionsStatsPoints( save_mode=save_mode,date=date,model_path=model_path).run()
+        UnifiedPredictor(target='points', save_mode=save_mode, date=date, model_path=model_path).run()
 
     elif process_name == "get_predictions_fantasy_points":
         print(f"Running process: {process_name} with date: {date} and model path:{model_path}")
-        PredictionsFantasyPoints( save_mode=save_mode,date=date,model_path=model_path).run()
+        UnifiedPredictor(target='fantasy_points', save_mode=save_mode, date=date, model_path=model_path).run()
         
     # print the time taken to run the process    
     print(f"Process {process_name} completed in {datetime.today() - time_start}.")

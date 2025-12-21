@@ -1,3 +1,4 @@
+from copyreg import pickle
 import pandas as pd
 import numpy as np
 import joblib
@@ -10,6 +11,8 @@ from sklearn.model_selection import RandomizedSearchCV, TimeSeriesSplit
 from lightgbm import LGBMRegressor
 from google.cloud import storage
 import tempfile
+
+from common.io_utils import _parse_gcs_uri
 
 logger = logging.getLogger(__name__)
 
@@ -227,8 +230,10 @@ def save_model_artifact(model: Any, metrics: Dict[str, Any],
         save_mode: save mode ('local' or 'bq')
         scaler: optional scaler object
     """
-    logger.info(f"Saving model artifact to {filepath}...")
-    
+    # Define full filepath
+    full_path = os.path.join(filepath, f"{target}_model.pkl")
+    logger.info(f"Saving model artifact to {full_path}...")
+
     # Package everything needed for prediction
     artifact = {
         'model': model,
@@ -240,17 +245,73 @@ def save_model_artifact(model: Any, metrics: Dict[str, Any],
         'categorical_cols': categorical_cols,
         'training_date': datetime.now().isoformat()
     }
-    
+
     if save_mode == "bq":
         # Save to GCS bucket
-        bucket_name, blob_name = filepath.removeprefix("gs://").split("/", 1)
+        bucket_name, blob_name = full_path.removeprefix("gs://").split("/", 1)
         with tempfile.NamedTemporaryFile(suffix=".pkl") as tmp:
             joblib.dump(artifact, tmp.name)
             storage.Client().bucket(bucket_name).blob(blob_name).upload_from_filename(tmp.name)
     elif save_mode == "local":
-        os.makedirs(os.path.dirname(filepath), exist_ok=True)
-        joblib.dump(artifact, filepath)
+        os.makedirs(os.path.dirname(full_path), exist_ok=True)
+        joblib.dump(artifact, full_path)
     else:
         raise ValueError(f"Unsupported save_mode: {save_mode}")
         
     logger.info(f"✅ Model saved successfully")
+
+
+def load_model_artifact(model_path: str, target: str, mode: str) -> Any:
+    """
+    Load a model artifact from either local disk or GCS.
+
+    Args:
+        model_path: local path or 'gs://bucket/obj' (can be directory or full .pkl path)
+        target: target variable name (e.g., 'points', 'fantasy_points')
+        mode: 'local' or 'bq' (if 'bq' and path is gs://, downloads from GCS)
+
+    Returns:
+        The trained model object
+    """
+    # If model_path is a directory, append the target model filename
+    if not model_path.endswith('.pkl'):
+        model_path = os.path.join(model_path, f'{target}_model.pkl')
+    
+    logger.info(f"Loading model artifact from {model_path}...")
+    
+    if mode == 'local':
+        # Load from local file system
+        logger.info(f"Loading model from local path: {model_path}")
+        artifact = joblib.load(model_path)
+        
+    elif mode == 'bq':
+        # Load from GCS
+        if not model_path.startswith('gs://'):
+            raise ValueError(f"GCS path must start with 'gs://': {model_path}")
+        
+        bucket_name, blob_path = _parse_gcs_uri(model_path)
+        logger.info(f"Loading model from GCS: bucket={bucket_name}, path={blob_path}")
+        
+        storage_client = storage.Client()
+        bucket = storage_client.bucket(bucket_name)
+        blob = bucket.blob(blob_path)
+        
+        # Download to temporary file and load with joblib
+        with tempfile.NamedTemporaryFile(suffix='.pkl', delete=False) as tmp:
+            blob.download_to_filename(tmp.name)
+            artifact = joblib.load(tmp.name)
+            os.unlink(tmp.name)  # Clean up temp file
+    else:
+        raise ValueError(f"Invalid mode: {mode}. Must be 'local' or 'bq'")
+    
+    # Extract model from artifact dictionary
+    if isinstance(artifact, dict):
+        model = artifact.get('model')
+        if model is None:
+            raise ValueError(f"Model artifact missing 'model' key. Found keys: {list(artifact.keys())}")
+        logger.info(f"✅ Model loaded successfully from {model_path}")
+        return model
+    else:
+        # Artifact is already a model object
+        logger.info(f"✅ Model loaded successfully from {model_path}")
+        return artifact

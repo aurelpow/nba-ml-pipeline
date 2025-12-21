@@ -26,7 +26,6 @@ from src.targets.fantasy_points import compute_fantasy_points
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
 
-
 # Default hyperparameters for each target
 DEFAULT_PARAMS = {
     'points': {
@@ -72,9 +71,10 @@ class UnifiedModelTrainer:
             raise ValueError(f"Invalid target: {target}. Must be 'points' or 'fantasy_points'")
         
         self.target = target
-        self.model_path = model_path
         self.save_mode = save_mode
         self.feature_cols = []
+        # Use the provided path as-is
+        self.model_path = model_path
         
         # Configure target-specific settings
         if target == 'points':

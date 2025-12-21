@@ -2,6 +2,7 @@
 
 *A complete, modular pipeline for fetching, processing, modeling, and predicting NBA player performance. 
 Whether you're exploring the data in a notebook or running daily inference in production, this repo has you covered.*
+Whether you're exploring the data in a notebook or running daily inference in production, this repo has you covered.*
 
 I built this because I love **basketball + data🏀📈**. 
 
@@ -10,23 +11,30 @@ I built this because I love **basketball + data🏀📈**.
 ## ✨ Recent Enhancements
 ![GitHub Release](https://img.shields.io/github/v/release/aurelpow/nba-ml-pipeline?color=blue&logo=github)
 
-**Production Training Pipeline (`src/training/`):**
+**Unified Architecture (`src/training/train.py` & `src/predictors/unified_predictor.py`):**
+- Single training pipeline for all targets via `--target` parameter
+- Single prediction pipeline with configuration-driven architecture
 - Automated train/test split selection (15%/20%/25%) with time-series cross-validation
-- Hyperparameter tuning: `RandomizedSearchCV` with `TimeSeriesSplit` (20 iterations, 9 params)
-- Feature engineering: position groups, historical opponent stats, rolling windows (3/7/15/30 games), per-36/per-possession metrics
+- Hyperparameter tuning: `RandomizedSearchCV` with `TimeSeriesSplit` (configurable via `--tune_params`)
 - Complete artifact packaging: model + features + metrics + best params
 
+**Feature Engineering:**
+- Position groups, historical opponent stats, rolling windows (configurable per target)
+- Per-36/per-possession metrics, rest days calculation
+- Intelligent feature alignment between training and inference
+- Target-specific configurations in `common/constants.py`
+
 **Fantasy Points Prediction (TTFL Formula 🌟):**
-- Dedicated pipeline for TrashTalk Fantasy League points (`src/training/train_fantasy_model.py`)
 - Custom TTFL target: PTS + REB + AST + STL + BLK + FGM + 3PM + FTM - TOV - Missed Shots
 - R² ~0.75 on training, ~0.63 on test set
 - Includes volatility metric for prediction confidence
 
-**Inference Pipeline (`src/predictors/`):**
+**Inference Pipeline:**
 - Mirror-accurate feature engineering matching training pipeline
+- Narrow format output: Measure codes (1-4) + Predictions column
+- Intelligent append logic prevents duplicates when re-running predictions
 - Handles missing data, new categories, DNPs gracefully
 - Supports local CSV and BigQuery persistence
-- Real-time predictions for upcoming games
 
 ---
 
@@ -42,11 +50,9 @@ nba-ml-pipeline/
 │   │   ├── get_nba_boxscore_basic.py
 │   │   └── get_nba_advanced_boxscore.py
 │   ├── training/              # Model training pipelines
-│   │   ├── train_model.py           # Points prediction training
-│   │   └── train_fantasy_model.py   # Fantasy points training
+│   │   └── train.py                 # Unified training for all targets
 │   ├── predictors/            # Prediction generators
-│   │   ├── get_predictions_stats_points.py
-│   │   └── get_predictions_fantasy_points.py
+│   │   └── unified_predictor.py     # Unified predictor for all targets
 │   └── targets/               # Target variable calculators
 │       └── fantasy_points.py
 ├── common/                    # Shared utilities
@@ -102,16 +108,22 @@ nba-ml-pipeline/
 
 ### 🚀 Training Pipeline
 
-**Points Prediction** ([src/training/train_model.py](src/training/train_model.py))
-```bash
-python main.py --process train_model --season 2024-25 \
-  --model_path ml_dev/models/best_lgbm_model.pkl --save_mode local
-```
+**Unified Training** ([src/training/train.py](src/training/train.py))
 
-**Fantasy Points (TTFL)** ([src/training/train_fantasy_model.py](src/training/train_fantasy_model.py))
+Train any target using the unified pipeline:
+
 ```bash
-python main.py --process train_fantasy_model --save_mode local \
-  --model_path ml_dev/models/fantasy_model.pkl
+# Points prediction
+python main.py --process train --target points \
+  --model_path ml_dev/models/points_model.pkl --save_mode local
+
+# Fantasy points (TTFL)
+python main.py --process train --target fantasy_points \
+  --model_path ml_dev/models/fantasy_points_model.pkl --save_mode local
+
+# With hyperparameter tuning
+python main.py --process train --target fantasy_points \
+  --model_path ml_dev/models/ --save_mode local --tune_params true
 ```
 
 **Features:**
@@ -123,27 +135,26 @@ python main.py --process train_fantasy_model --save_mode local \
 ---
 ## 🧰 Inference Pipeline
 
-### Points Prediction ([src/predictors/get_predictions_stats_points.py](src/predictors/get_predictions_stats_points.py))
+### Unified Predictions ([src/predictors/unified_predictor.py](src/predictors/unified_predictor.py))
 
-Generates player-game predictions with feature engineering matching the training pipeline exactly.
+Generates predictions for any target with feature engineering matching the training pipeline exactly.
 
-**Usage:**
+**Points Prediction:**
 ```bash
 python main.py --process get_predictions_stats_points \
-  --date "2025-12-05" --model_path ml_dev/models/best_lgbm_model.pkl --save_mode local
+  --date "2025-12-05" --model_path ml_dev/models/points_model.pkl --save_mode local
 ```
 
-### Fantasy Points ([src/predictors/get_predictions_fantasy_points.py](src/predictors/get_predictions_fantasy_points.py))
-
-Generates predictions for TrashTalk Fantasy League (TTFL) points with volatility metrics.
-
-**Usage:**
+**Fantasy Points (TTFL):**
 ```bash
 python main.py --process get_predictions_fantasy_points \
-  --date "2025-12-05" --model_path ml_dev/models/fantasy_model.pkl --save_mode local
+  --date "2025-12-05" --model_path ml_dev/models/fantasy_points_model.pkl --save_mode local
 ```
 
-**Output:** CSV with `predictedFantasyPoints` and `fantasyVolatility` (prediction confidence)
+**Output:** 
+- Narrow format CSV with `Measure` (1=points_pred, 2=fantasy_pred, 3=points_vol, 4=fantasy_vol) and `Predictions` columns
+- Includes volatility metrics for prediction confidence
+- Intelligent append logic prevents duplicates when re-running same dates
 
 ## 📁 Repository Structure
 
@@ -154,15 +165,18 @@ NBA_project_ML/
 ├── requirements.txt      # Core Python dependencies
 ├── main.py               # CLI entrypoint for individual subprocesses
 ├── src/                  # Modular ETL and inference scripts
-│   ├── get_nba_players.py
-│   ├── get_nba_teams.py
-│   ├── get_nba_boxscore_basic.py
-│   ├── get_nba_advanced_boxscore.py
-│   ├── get_nba_schedule.py
-│   ├── get_predictions_stats_points.py
-│   ├── get_predictions_fantasy_points.py
-│   ├── train_model.py   
-│   └── train_fantasy_model.py
+│   ├── data_collectors/
+│   │   ├── get_nba_players.py
+│   │   ├── get_nba_teams.py
+│   │   ├── get_nba_boxscore_basic.py
+│   │   ├── get_nba_advanced_boxscore.py
+│   │   └── get_nba_schedule.py
+│   ├── training/
+│   │   └── train.py              # Unified training pipeline
+│   ├── predictors/
+│   │   └── unified_predictor.py  # Unified prediction pipeline
+│   └── targets/
+│       └── fantasy_points.py
 ├── common/               # Shared utilities, parsers, and singletons
 │   ├── common.py
 │   ├── io_utils.py
@@ -192,10 +206,11 @@ NBA_project_ML/
 | `SEASON` | ✅ | `2024-25` | Target season |
 | `SEASON_TYPE` | ❕ | `Regular Season` | Default: Regular Season |
 | `DATE` | ❕ | `2025-05-01` | Start date for inference (required for predictions) |
-| `DAYS_NUMBER` | ❕ | `1` | Days ahead (default: 1) |
 | `SAVE_MODE` | ❕ | `local` \| `bq` | CSV vs BigQuery (default: local) |
 | `MODEL_PATH` | ❕ | `ml_dev/models/best_lgbm_model.pkl` \| `gs://…/model.pkl` | Local or GCS path |
 | `HTTP_PROXY` / `HTTPS_PROXY` | ❕ | secret | Use in cloud to avoid API timeouts |
+
+> **Note**: If `MODEL_PATH` starts with `gs://`, the app downloads the file at runtime (see `common/io_utils.py::load_model()`).
 
 > **Note**: If `MODEL_PATH` starts with `gs://`, the app downloads the file at runtime (see `common/io_utils.py::load_model()`).
 
@@ -231,33 +246,41 @@ NBA_project_ML/
 
 **Train a new model:**
 ```bash
-python -u main.py -p train_model -s 2024-25 -m "ml_dev/models/best_lgbm_model_v3.pkl" -sm "local"
-# Runs full training pipeline with hyperparameter tuning
+# Points prediction
+python -u main.py -p train -t points -m "ml_dev/models/points_model.pkl" -sm "local" --tune_params true
+
+# Fantasy points
+python -u main.py -p train -t fantasy_points -m "ml_dev/models/fantasy_points_model.pkl" -sm "local" --tune_params false
+
 # Output: trained model saved to specified path with metrics
 ```
 
 **Generate predictions for specific date:**
 ```bash
-python -u main.py -p get_predictions_stats_points -s 2024-25 -d "2025-04-13" -m "ml_dev/models/best_lgbm_model.pkl" -sm "local"
-# -> ./databases/nba_points_predictions_df.csv
+python -u main.py -p get_predictions_stats_points -d "2025-04-13" -m "ml_dev/models/points_model.pkl" -sm "local"
+# -> ./databases/nba_predictions_df.csv
 ```
 
 **Parameters:**
-- `-p` process name (`train_model` | `get_predictions_stats_points` | `get_nba_players` | etc.)
+- `-p` process name (`train` | `get_predictions_stats_points` | `get_predictions_fantasy_points` | `get_nba_players` | etc.)
+- `-t` target for training (`points` | `fantasy_points`)
 - `-s` season (e.g., `2024-25`)
 - `-d` date for predictions (format: `YYYY-MM-DD`)
 - `-m` model path (local or `gs://...`)
 - `-sm` save mode (`local` | `bq`)
+- `--tune_params` enable hyperparameter tuning (`true` | `false`)
 
 ### B) Docker
 
 **Train model:**
 ```bash
 docker run --rm \
-  -e PROCESS="train_model" \
+  -e PROCESS="train" \
+  -e TARGET="points" \
   -e SEASON="2024-25" \
   -e SAVE_MODE="local" \
-  -e MODEL_PATH="ml_dev/models/best_lgbm_model.pkl" \
+  -e MODEL_PATH="ml_dev/models/points_model.pkl" \
+  -e TUNE_HYPERPARAMETERS="false" \
   nba_project_ml:latest
 ```
 
@@ -267,12 +290,17 @@ docker run --rm \
   -e PROCESS="get_predictions_stats_points" \
   -e SEASON="2024-25" \
   -e SEASON_TYPE="Regular Season" \
+  -e PROCESS="get_predictions_stats_points" \
+  -e SEASON="2024-25" \
+  -e SEASON_TYPE="Regular Season" \
   -e DATE="2025-05-01" \
   -e SAVE_MODE="local" \
   -e MODEL_PATH="ml_dev/models/best_lgbm_model.pkl" \
   nba_project_ml:latest
 ```
 ### C) Cloud Run Job (BigQuery + proxy secret)
+
+**Setup:**
 
 **Setup:**
 ```bash
@@ -302,20 +330,56 @@ gcloud run jobs create nba-training-job \
 
 **Create Cloud Run Job for Predictions:**
 ```bash
+```
+
+**Create Cloud Run Job for Training:**
+```bash
+gcloud run jobs create nba-training-job \
+  --image "$IMAGE_URI" \
+  --region "$REGION" \
+  --set-env-vars=PROCESS=train_model,SEASON=2024-25,SAVE_MODE=bq,MODEL_PATH="${MODEL_PATH}" \
+  --set-secrets=HTTPS_PROXY=PROXY_URL:latest,HTTP_PROXY=PROXY_URL:latest \
+  --max-retries=1 --memory=2Gi --cpu=2 --task-timeout=3600s
+```
+
+**Create Cloud Run Job for Predictions:**
+```bash
 gcloud run jobs create nba-prediction-job \
   --image "$IMAGE_URI" \
   --region "$REGION" \
-  --set-env-vars=SEASON=2024-25,SEASON_TYPE="Regular Season",DATE=2025-05-01,DAYS_NUMBER=1,SAVE_MODE=bq,MODEL_PATH="${MODEL_PATH}" \
+  --set-env-vars=SEASON=2024-25,SEASON_TYPE="Regular Season",DATE=2025-05-01,SAVE_MODE=bq,MODEL_PATH="${MODEL_PATH}" \
   --set-secrets=HTTPS_PROXY=PROXY_URL:latest,HTTP_PROXY=PROXY_URL:latest \
   --max-retries=1 --memory=1Gi --cpu=1 --task-timeout=1800s \
 || gcloud run jobs update nba-prediction-job \
   --image "$IMAGE_URI" \
   --region "$REGION" \
-  --set-env-vars=SEASON=2024-25,SEASON_TYPE="Regular Season",DATE=2025-05-01,DAYS_NUMBER=1,SAVE_MODE=bq,MODEL_PATH="${MODEL_PATH}" \
+  --set-env-vars=SEASON=2024-25,SEASON_TYPE="Regular Season",DATE=2025-05-01,SAVE_MODE=bq,MODEL_PATH="${MODEL_PATH}" \
   --set-secrets=HTTPS_PROXY=PROXY_URL:latest,HTTP_PROXY=PROXY_URL:latest
 
 # Execute ad-hoc
 gcloud run jobs execute nba-prediction-job --region "$REGION"
+gcloud run jobs execute nba-training-job --region "$REGION"
+```
+
+**Scheduling (Cloud Scheduler):**
+```bash
+# Daily predictions at 10 AM EST
+gcloud scheduler jobs create http nba-daily-predictions \
+  --location="$REGION" \
+  --schedule="0 10 * * *" \
+  --time-zone="America/New_York" \
+  --uri="https://run.googleapis.com/v1/projects/$PROJECT_ID/locations/$REGION/jobs/nba-prediction-job:run" \
+  --http-method=POST \
+  --oauth-service-account-email="your-service-account@$PROJECT_ID.iam.gserviceaccount.com"
+
+# Weekly model retraining (Sunday at 2 AM)
+gcloud scheduler jobs create http nba-weekly-training \
+  --location="$REGION" \
+  --schedule="0 2 * * 0" \
+  --time-zone="America/New_York" \
+  --uri="https://run.googleapis.com/v1/projects/$PROJECT_ID/locations/$REGION/jobs/nba-training-job:run" \
+  --http-method=POST \
+  --oauth-service-account-email="your-service-account@$PROJECT_ID.iam.gserviceaccount.com"
 gcloud run jobs execute nba-training-job --region "$REGION"
 ```
 
@@ -353,3 +417,74 @@ gcloud scheduler jobs create http nba-weekly-training \
 - **🩺 Injury-aware predictions**
 - **🌐 API Service**: Expose predictions via a REST API (FastAPI/Flask) for real-time applications.
 - **📊 Dashboard**: Build an interactive dashboard (Plotly Dash or Power BI) to visualize predictions and model performance.
+
+## 🚀 Quick Start
+
+### 1. Configure Google Cloud Platform
+
+Before deploying, you need to configure your GCP settings. The repository includes an example configuration file.
+
+#### Create Your Configuration File
+
+```bash
+# Copy the example file
+cp scripts/gcp_config.sh.example scripts/gcp_config.sh
+
+# Edit with your GCP information
+nano scripts/gcp_config.sh
+```
+
+#### Update These Values
+
+Open `scripts/gcp_config.sh` and replace the placeholders:
+
+| Placeholder | Your Value | Description |
+|-------------|------------|-------------|
+| `your-project-id` | `ml-nba-project` | Your GCP project ID |
+| `your-bucket-name` | `ml-nba-project_cloudbuild` | Your Cloud Storage bucket |
+| `your-service-account@...` | `nba-cloud-run-sa@ml-nba-project.iam.gserviceaccount.com` | Your service account email |
+| `your-docker-repo` | `nba-docker-repo` | Your Artifact Registry repository |
+
+**Example:**
+```bash
+# Before (example file)
+export PROJECT_ID="your-project-id"
+
+# After (your config)
+export PROJECT_ID="ml-nba-project"
+```
+
+**⚠️ Security Note:**
+- `gcp_config.sh` is in `.gitignore` - your credentials stay private
+- `gcp_config.sh.example` contains only placeholders - safe to share
+- Never commit real credentials to version control!
+
+#### Alternative: Interactive Setup
+
+```bash
+./scripts/setup_gcp_config.sh
+```
+
+This wizard will prompt for each value and create the config file for you.
+
+### 2. Deploy to Cloud Run
+
+```bash
+# For development
+./scripts/deploy_develop.sh
+
+# For production
+./scripts/deploy_production.sh
+```
+
+### 3. Create and Run Jobs
+
+```bash
+# Create job
+./scripts/create_cloud_run_job_develop.sh fantasy_points false
+
+# Run job
+./scripts/run_cloud_job_develop.sh fantasy_points
+```
+
+📚 **See [Cloud Setup Quickstart](docs/CLOUD_SETUP_QUICKSTART.md) for detailed instructions**

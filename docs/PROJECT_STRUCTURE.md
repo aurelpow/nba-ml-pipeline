@@ -22,13 +22,10 @@ NBA_project_ML/
 │   │   └── get_nba_advanced_boxscore.py
 │   │
 │   ├── training/              # Model training pipelines
-│   │   ├── train.py           # Unified training module (NEW!)
-│   │   ├── train_model.py     # Legacy points trainer (deprecated)
-│   │   └── train_fantasy_model.py  # Legacy fantasy trainer (deprecated)
+│   │   └── train.py           # Unified training module for all targets
 │   │
 │   ├── predictors/            # Prediction/inference modules
-│   │   ├── get_predictions_stats_points.py
-│   │   └── get_predictions_fantasy_points.py
+│   │   └── unified_predictor.py   # Unified predictor for all targets
 │   │
 │   └── targets/               # Target variable calculators
 │       └── fantasy_points.py

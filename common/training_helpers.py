@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 from typing import Dict, List, Tuple, Any
 
-from common.io_utils import BoxscoreFileName, AdvancedBoxscoreFileName, PlayersFileName, load_data
+from common.io_utils import BoxscoreFileName, AdvancedBoxscoreFileName, PlayersFileName, MetricsFileName, load_data, save_database
 from common.feature_engineering import (
     merge_data, preprocess_data, create_historical_features,
     normalize_features, compute_rolling_stats, encode_categorical_features,
@@ -87,7 +87,7 @@ def transform_data(
     
     # 4. Encode Categoricals
     logger.info("Encoding categorical features...")
-    df, encoded_cols, _ = encode_categorical_features(df, categorical_cols)
+    df, encoded_cols = encode_categorical_features(df, categorical_cols)
     
     # 5. Define Feature Columns
     feature_cols = get_feature_cols(key_stats, rolling_periods=rolling_windows)
@@ -217,3 +217,19 @@ def persist_model(
         save_mode=save_mode
     )
     logger.info("Model saved successfully!")
+    
+    # Save metrics to database
+    logger.info("Saving training metrics to database...")
+    
+    # Add target variable to metrics
+    metrics['target_variable'] = target_variable
+    # Convert metrics to DataFrame
+    metrics_df = pd.DataFrame([metrics])
+
+    save_database(
+        df=metrics_df,
+        table_name=MetricsFileName,
+        mode=save_mode,
+        write_disposition="WRITE_APPEND"
+    )
+    logger.info("Training metrics persisted successfully!")
