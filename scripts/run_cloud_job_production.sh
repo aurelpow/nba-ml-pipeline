@@ -32,11 +32,15 @@ echo "   • Job: ${JOB_NAME}"
 echo ""
 echo "⚠️  WARNING: This will execute a PRODUCTION job!"
 echo ""
-read -p "Are you sure you want to continue? (yes/no): " confirm
 
-if [ "$confirm" != "yes" ]; then
-    echo "❌ Execution cancelled"
-    exit 0
+if [ -z "$CI" ] && [ -z "$JENKINS_URL" ]; then
+    read -p "Are you sure you want to continue? (yes/no): " confirm
+    if [ "$confirm" != "yes" ]; then
+        echo "❌ Execution cancelled"
+        exit 0
+    fi
+else
+    echo "⏭️  CI/CD environment detected: Skipping confirmation prompt"
 fi
 
 echo ""

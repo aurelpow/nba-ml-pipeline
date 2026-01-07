@@ -22,14 +22,14 @@ echo "=================================================="
 echo ""
 echo "⚠️  WARNING: This will deploy to PRODUCTION!"
 echo ""
-if [ -z "$JENKINS_URL" ]; then
+if [ -z "$CI" ] && [ -z "$JENKINS_URL" ]; then
     read -p "Are you sure you want to continue? (yes/no): " confirm
     if [ "$confirm" != "yes" ]; then
         echo "❌ Deployment cancelled"
         exit 0
     fi
 else
-    echo "⏭️  Jenkins environment detected: Skipping confirmation prompt"
+    echo "⏭️  CI/CD environment detected: Skipping confirmation prompt"
 fi
 
 # 🔄 1. Sync with GitHub (skip if in Jenkins)

@@ -7,6 +7,9 @@ pipeline {
     }
 
     environment {
+        // CI/CD Detection (prevents interactive prompts in scripts)
+        CI = 'true'
+        
         // Map branch to script suffix: master -> production, dev -> develop
         ENV_SUFFIX = "${env.BRANCH_NAME == 'master' ? 'production' : 'develop'}"
         GCP_CREDS_ID = 'gcp-service-account-key' 
@@ -61,15 +64,17 @@ pipeline {
                 ]) {
                     script {
                         // 1. Copy the secret file into the location your scripts expect
-                        sh "cp ${SECURE_CONFIG} scripts/gcp_config.sh"
-                        sh "chmod +x scripts/*.sh"
+                        sh "cp \"${SECURE_CONFIG}\" scripts/gcp_config.sh"
+                        sh 'chmod +x scripts/*.sh'
                         
-                        // 2. Authenticate using the injected config
-                        sh """
-                            source scripts/gcp_config.sh
-                            gcloud auth activate-service-account --key-file=${GCP_KEY} --quiet
-                            gcloud config set project \$PROJECT_ID --quiet
-                        """
+                        // 2. Authenticate using the injected config (use bash explicitly)
+                        sh '''
+                            #!/bin/bash
+                            set -e
+                            . scripts/gcp_config.sh
+                            gcloud auth activate-service-account --key-file="${GCP_KEY}" --quiet
+                            gcloud config set project "${PROJECT_ID}" --quiet
+                        '''.stripIndent()
                     }
                 }
             }
