@@ -10,24 +10,33 @@ set -e  # Exit on any error
 
 # Load GCP configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/gcp_config.sh"
+if [ -f "${SCRIPT_DIR}/gcp_config.sh" ]; then
+    source "${SCRIPT_DIR}/gcp_config.sh"
+else
+    echo "⚠️  gcp_config.sh not found, relying on environment variables."
+fi
 
 echo "=================================================="
 echo "🔧 DEPLOY TO DEVELOP ENVIRONMENT"
 echo "=================================================="
 echo ""
 
-# 🔄 1. Sync with GitHub
-echo "📥 Step 1: Syncing with GitHub..."
-echo "   • Branch: ${DEV_BRANCH}"
-echo "   • Directory: ${PROJECT_DIR}"
-cd "${PROJECT_DIR}" || { echo "❌ Directory not found: ${PROJECT_DIR}"; exit 1; }
+# 🔄 1. Sync with GitHub (skip if in Jenkins)
+if [ -z "$JENKINS_URL" ]; then
+    echo "📥 Step 1: Syncing with GitHub..."
+    echo "   • Branch: ${DEV_BRANCH}"
+    echo "   • Directory: ${PROJECT_DIR}"
+    cd "${PROJECT_DIR}" || { echo "❌ Directory not found: ${PROJECT_DIR}"; exit 1; }
 
-git fetch origin
-git reset --hard "origin/${DEV_BRANCH}"
+    git fetch origin
+    git reset --hard "origin/${DEV_BRANCH}"
 
-echo "✅ Code synced with remote branch"
-echo ""
+    echo "✅ Code synced with remote branch"
+    echo ""
+else
+    echo "⏭️  Step 1: Skipping GitHub sync (Jenkins environment detected)"
+    cd "${PROJECT_DIR}"
+fi
 
 # 🧩 2. Display environment variables
 echo "🧩 Step 2: Using environment configuration..."

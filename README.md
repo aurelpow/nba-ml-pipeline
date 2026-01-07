@@ -166,6 +166,15 @@ NBA_project_ML/
 ├── run_all.sh            # Orchestrates all processes via env-vars
 ├── requirements.txt      # Core Python dependencies
 ├── main.py               # CLI entrypoint for individual subprocesses
+├── scripts/              # Deployment and setup scripts
+│   ├── deploy_develop.sh
+│   ├── create_cloud_run_job_develop.sh
+│   ├── run_cloud_job_develop.sh
+│   ├── deploy_production.sh
+│   ├── create_cloud_run_job_production.sh
+│   ├── run_cloud_job_production.sh
+│   ├── setup_gcp_config.sh # Interactive GCP config setup
+│   └── gcp_config.sh.example # GCP config template
 ├── src/                  # Modular ETL and inference scripts
 │   ├── data_collectors/
 │   │   ├── get_nba_players.py

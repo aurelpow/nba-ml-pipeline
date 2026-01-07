@@ -8,7 +8,11 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/gcp_config.sh"
+if [ -f "${SCRIPT_DIR}/gcp_config.sh" ]; then
+    source "${SCRIPT_DIR}/gcp_config.sh"
+else
+    echo "⚠️  gcp_config.sh not found, relying on environment variables."
+fi
 
 # Parse arguments (override config if provided)
 TUNE_PARAMS="${1:-${TUNE_PARAMS:-true}}"

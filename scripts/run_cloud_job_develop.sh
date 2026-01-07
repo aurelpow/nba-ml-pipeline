@@ -12,7 +12,11 @@ set -e  # Exit on any error
 
 # Load GCP configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/gcp_config.sh"
+if [ -f "${SCRIPT_DIR}/gcp_config.sh" ]; then
+    source "${SCRIPT_DIR}/gcp_config.sh"
+else
+    echo "⚠️  gcp_config.sh not found, relying on environment variables."
+fi
 
 JOB_NAME="nba-training-develop"
 
