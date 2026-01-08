@@ -33,20 +33,14 @@ else
 fi
 
 # 🔄 1. Sync with GitHub (skip if in Jenkins)
+# 🔄 1. Sync with GitHub (skip if in Jenkins)
 if [ -z "$JENKINS_URL" ]; then
-    echo "📥 Step 1: Syncing with GitHub..."
-    echo "   • Branch: ${PROD_BRANCH}"
-    echo "   • Directory: ${PROJECT_DIR}"
-    cd "${PROJECT_DIR}" || { echo "❌ Directory not found: ${PROJECT_DIR}"; exit 1; }
-
+    echo "📥 Syncing with GitHub (Local Mode)..."
+    cd "${PROJECT_DIR}"
     git fetch origin
     git reset --hard "origin/${PROD_BRANCH}"
-
-    echo "✅ Code synced with main branch"
-    echo ""
 else
-    echo "⏭️  Step 1: Skipping GitHub sync (Jenkins environment detected)"
-    cd "${PROJECT_DIR}"
+    echo "⏭️ Jenkins detected: Skipping Git Sync"
 fi
 
 # 🧩 2. Define variables for PRODUCTION environment
