@@ -29,9 +29,9 @@ TUNE_PARAMS="${1:-${TUNE_PARAMS:-false}}"
 JOB_NAME="nba-training-develop"
 
 # Define targets and model directory
-# We pass the directory so UnifiedModelTrainer can save {target}_model.pkl inside it
 TARGETS="${TARGETS:-points fantasy_points}"
-MODEL_DIR="gs://${BUCKET_NAME}/${MODELS_FOLDER}/develop"
+MODEL_PATH="gs://${BUCKET_NAME}/${MODELS_FOLDER}/develop"
+
 
 echo "=================================================="
 echo "🔧 CREATE CLOUD RUN JOB - DEVELOP"
@@ -40,44 +40,48 @@ echo ""
 echo "📦 Job Configuration:"
 echo "   • Name: ${JOB_NAME}"
 echo "   • Targets: ${TARGETS}"
-echo "   • Model Dir: ${MODEL_DIR}"
+echo "   • Model Path: ${MODEL_PATH}"
 echo "   • Tune Params: ${TUNE_PARAMS}"
 echo "   • Region: ${REGION}"
 echo "   • Image: ${DEV_IMAGE_URI}"
 echo "   • Service Account: ${SERVICE_ACCOUNT}"
 echo ""
 
-# 🗑️ Delete existing job if it exists
-echo "🔍 Checking for existing job..."
-if gcloud run jobs describe "${JOB_NAME}" --region="${REGION}" --project="${PROJECT_ID}" &>/dev/null; then
-    echo "⚠️  Job '${JOB_NAME}' already exists. Deleting..."
-    gcloud run jobs delete "${JOB_NAME}" \
-        --region="${REGION}" \
-        --project="${PROJECT_ID}" \
-        --quiet
-    echo "✅ Existing job deleted"
-else
-    echo "✅ No existing job found"
-fi
-echo ""
-
-# 🚀 Create Cloud Run Job
-echo "📦 Creating Cloud Run Job: ${JOB_NAME}..."
+# � Create or Update Cloud Run Job
+echo "📦 Managing Cloud Run Job: ${JOB_NAME}..."
 
 # Ensure secrets are defined (default to standard names if missing in config)
 NBA_PROXY_USER_SECRET="${NBA_PROXY_USER_SECRET:-nba-proxy-user}"
 NBA_PROXY_PASS_SECRET="${NBA_PROXY_PASS_SECRET:-nba-proxy-pass}"
 
-gcloud run jobs create ${JOB_NAME} \
-  --image=${DEV_IMAGE_URI} \
-  --region=${REGION} \
-  --service-account=${SERVICE_ACCOUNT} \
-  --memory=${MEMORY} \
-  --cpu=${CPU} \
-  --task-timeout=${TIMEOUT} \
-  --max-retries=${MAX_RETRIES} \
-  --set-env-vars="SEASON=${SEASON},SEASON_TYPE=${SEASON_TYPE},SAVE_MODE=bq,TARGET=${TARGETS},MODEL_PATH=${MODEL_DIR},TUNE_HYPERPARAMETERS=${TUNE_PARAMS}" \
-  --set-secrets="NBA_PROXY_USER=${NBA_PROXY_USER_SECRET}:latest,NBA_PROXY_PASS=${NBA_PROXY_PASS_SECRET}:latest"
+# Check if the job already exists and update it if so
+if gcloud run jobs describe "${JOB_NAME}" --region="${REGION}" --project="${PROJECT_ID}" &>/dev/null; then
+    echo "🔄 Job exists. Updating configuration..."
+    gcloud run jobs update ${JOB_NAME} \
+      --image=${DEV_IMAGE_URI} \
+      --region=${REGION} \
+      --service-account=${SERVICE_ACCOUNT} \
+      --memory=${MEMORY} \
+      --cpu=${CPU} \
+      --task-timeout=${TIMEOUT} \
+      --max-retries=${MAX_RETRIES} \
+      --set-env-vars="TARGETS=${TARGETS},TUNE_PARAMS=${TUNE_PARAMS},MODEL_PATH=${MODEL_PATH},SEASON=${SEASON},SEASON_TYPE=${SEASON_TYPE},SAVE_MODE=${SAVE_MODE}" \
+      --set-secrets="NBA_PROXY_USER=${NBA_PROXY_USER_SECRET}:latest,NBA_PROXY_PASS=${NBA_PROXY_PASS_SECRET}:latest" \
+      --quiet
+else
+    echo "✨ Job not found. Creating new job..."
+    gcloud run jobs create ${JOB_NAME} \
+      --image=${DEV_IMAGE_URI} \
+      --region=${REGION} \
+      --service-account=${SERVICE_ACCOUNT} \
+      --memory=${MEMORY} \
+      --cpu=${CPU} \
+      --task-timeout=${TIMEOUT} \
+      --max-retries=${MAX_RETRIES} \
+      --set-env-vars="TARGETS=${TARGETS},TUNE_PARAMS=${TUNE_PARAMS},MODEL_PATH=${MODEL_PATH},SEASON=${SEASON},SEASON_TYPE=${SEASON_TYPE},SAVE_MODE=${SAVE_MODE}" \
+      --set-secrets="NBA_PROXY_USER=${NBA_PROXY_USER_SECRET}:latest,NBA_PROXY_PASS=${NBA_PROXY_PASS_SECRET}:latest" \
+      --quiet
+fi
 
 echo ""
 echo "=================================================="

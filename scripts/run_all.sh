@@ -4,10 +4,10 @@ set -euo pipefail
 # ---- required/optional env ----
 : "${SEASON:?Please set SEASON (e.g. 2024-25)}"
 : "${SEASON_TYPE:=Regular Season}"      # default to Regular Season
-: "${SAVE_MODE:=bq}"                    # default to BigQuery
-: "${MODEL_PATH:=ml_dev/models/best_lgbm_model_v2.pkl}"
-: "${TARGET:=points}"                  # default to points only
-: "${TUNE_HYPERPARAMETERS:=false}"      # default to no tuning
+: "${SAVE_MODE:=local}"                    # default to local (bq for Cloud)
+: "${MODEL_PATH:=ml_dev/models}"            # default to local directory
+: "${TARGET:=points}"                      # default to points only
+: "${TUNE_HYPERPARAMETERS:=false}"         # default to no tuning
 
 # Optional proxy creds (exported if present)
 : "${NBA_PROXY_USER:=}"

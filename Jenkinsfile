@@ -82,7 +82,7 @@ pipeline {
         stage('Smoke Test') {
             when {
                 expression { 
-                    return (CLEAN_BRANCH == 'master' || CLEAN_BRANCH == 'dev' || CLEAN_BRANCH == 'feature/jenkins-integration')
+                    return (CLEAN_BRANCH == 'master' || CLEAN_BRANCH == 'dev' || CLEAN_BRANCH.contains('jenkins-integration'))
                 }
             }
             steps {
