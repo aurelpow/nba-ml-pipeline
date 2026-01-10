@@ -115,6 +115,65 @@ Go to **Manage Jenkins → Credentials → System → Global credentials**
 - **ID:** `gcp-config-sh`
 - **File:** Upload your `scripts/gcp_config.sh`
 
+<<<<<<< HEAD
+#### c) GitHub Token
+- **Kind:** Username with password
+- **ID:** `github-token`
+- **Username:** Your GitHub username
+- **Password:** Personal Access Token (PAT) with `repo` scope
+
+### 4. Create Multibranch Pipeline (Recommended)
+
+**Why Multibranch?**
+- ✅ Automatically discovers branches with Jenkinsfiles
+- ✅ Ignores branches without Jenkinsfiles (no errors)
+- ✅ Auto-removes deleted branches
+- ✅ Cleaner management for multiple environments
+
+**Setup:**
+
+1. **New Item** → **Multibranch Pipeline**
+2. **Name:** `NBA-ML-Pipeline`
+3. Click **OK**
+
+**Configure Branch Sources:**
+
+4. **Branch Sources** → **Add source** → **Git**
+5. **Project Repository:**
+   ```
+   https://github.com/aurelpow/nba-ml-pipeline.git
+   ```
+6. **Credentials:** Select `github-token`
+
+**Configure Branch Discovery:**
+
+7. **Behaviors** → **Add** → **"Discover branches"**
+   - **Strategy:** All branches
+
+8. **Behaviors** → **Add** → **"Filter by name (with regular expression)"**
+   - **Regular expression:**
+     ```
+     (dev|master)
+     ```
+   - This ensures only `dev` and `master` branches trigger builds
+
+**Build Configuration:**
+
+9. **Build Configuration:**
+   - **Mode:** by Jenkinsfile
+   - **Script Path:** `Jenkinsfile`
+
+**Scan Trigger:**
+
+10. **Scan Multibranch Pipeline Triggers:**
+    - ✅ Enable: "Periodically if not otherwise run"
+    - **Interval:** `5 minutes`
+
+11. Click **Save**
+
+Jenkins will immediately scan your repository and create sub-jobs for each matching branch.
+
+=======
 #### c) GitHub Token (for private repos)
 - **Kind:** Username with password
 - **ID:** `github-token`
@@ -133,11 +192,53 @@ Go to **Manage Jenkins → Credentials → System → Global credentials**
    - **Branches to build:** `*/dev`, `*/master`
    - **Script Path:** `Jenkinsfile`
 
+>>>>>>> f6e7fb6c92a7753df8bf2f8eaa1c049d8493b64f
 ---
 
 ## Triggering Pipelines
 
 ### Manual Trigger
+<<<<<<< HEAD
+1. Go to Jenkins dashboard
+2. Click on **NBA-ML-Pipeline**
+3. Click on the branch (e.g., **dev**)
+4. Click **"Build Now"**
+
+### Automatic Trigger (Periodic Scanning)
+
+The multibranch pipeline **automatically scans** for changes (configured in step 10 above).
+
+**How it works:**
+- Every 5 minutes, Jenkins scans the GitHub repository
+- Detects new commits on `dev` or `master` branches
+- Automatically triggers builds for changed branches
+- Also discovers new branches matching the regex filter
+
+**View scan activity:**
+- Go to **NBA-ML-Pipeline** main page
+- Click **"Scan Repository Log"** (left sidebar)
+- See timestamps of scans and detected changes
+
+**Manual scan:**
+- Click **"Scan Repository Now"** to trigger immediate scan
+
+### Expected Pipeline Structure
+
+After setup, your Jenkins dashboard shows:
+
+```
+NBA-ML-Pipeline (Multibranch Pipeline)
+  ├─ dev
+  │   └─ #1, #2, #3... (build history)
+  └─ master (appears after Jenkinsfile is merged)
+      └─ #1, #2, #3... (build history)
+```
+
+**Branch Status:**
+- ✅ **Green** - Build successful, deployed to environment
+- ❌ **Red** - Build failed, check console output
+- ⏸️ **Gray** - Not built yet (no Jenkinsfile found)
+=======
 1. Go to your Jenkins job
 2. Click **"Build Now"**
 3. Select branch if multi-branch pipeline
@@ -160,6 +261,7 @@ Since Jenkins runs **locally behind your router/firewall**, GitHub cannot reach 
 - Jenkins polls GitHub every 5 minutes
 - Detects new commits on `dev` or `master`
 - Automatically triggers pipeline
+>>>>>>> f6e7fb6c92a7753df8bf2f8eaa1c049d8493b64f
 
 **⚠️ Limitations:**
 - Your computer must be running for polling to work
@@ -287,6 +389,34 @@ gcloud compute instances create jenkins-server \
 
 ## Troubleshooting
 
+<<<<<<< HEAD
+### No Branches Showing in Multibranch Pipeline
+**Symptom:** Multibranch pipeline created but no branches appear
+
+**Solution:**
+1. Click **"Scan Repository Now"**
+2. Check **"Scan Repository Log"** for errors
+3. Verify GitHub credentials are correct
+4. Ensure regex filter `(dev|master)` matches your branch names
+
+### Branch Shows But Not Building
+**Symptom:** Branch appears but no builds triggered
+
+**Solution:**
+- Gray status = No Jenkinsfile found in that branch
+- Push Jenkinsfile to the branch
+- Click **"Scan Repository Now"** to refresh
+
+### Multiple Pipelines Conflicting
+**Symptom:** Getting "Changes found" but builds fail
+
+**Solution:**
+- Delete old single-branch pipeline jobs
+- Keep only the multibranch pipeline
+- Disable "Poll SCM" on old jobs before deleting
+
+=======
+>>>>>>> f6e7fb6c92a7753df8bf2f8eaa1c049d8493b64f
 ### Jenkins Not Starting
 ```bash
 # Check container status
@@ -315,10 +445,21 @@ gcloud builds submit --tag=us-central1-docker.pkg.dev/ml-nba-project/nba-docker-
 # Check Cloud Build logs in GCP Console
 ```
 
+<<<<<<< HEAD
+### Periodic Scanning Not Working
+**Symptom:** Repository not being scanned automatically
+
+**Solution:**
+1. Configure → **Scan Multibranch Pipeline Triggers**
+2. Enable "Periodically if not otherwise run"
+3. Set interval to `5 minutes`
+4. Check **"Scan Repository Log"** for scan history
+=======
 ### Poll SCM Not Working
 - Verify GitHub repository URL is correct
 - Check Git Polling Log in Jenkins job
 - Ensure Docker container has internet access
+>>>>>>> f6e7fb6c92a7753df8bf2f8eaa1c049d8493b64f
 
 ### "Permission Denied" on Scripts
 ```bash
