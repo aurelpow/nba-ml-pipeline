@@ -115,7 +115,6 @@ Go to **Manage Jenkins → Credentials → System → Global credentials**
 - **ID:** `gcp-config-sh`
 - **File:** Upload your `scripts/gcp_config.sh`
 
-<<<<<<< HEAD
 #### c) GitHub Token
 - **Kind:** Username with password
 - **ID:** `github-token`
@@ -173,32 +172,11 @@ Go to **Manage Jenkins → Credentials → System → Global credentials**
 
 Jenkins will immediately scan your repository and create sub-jobs for each matching branch.
 
-=======
-#### c) GitHub Token (for private repos)
-- **Kind:** Username with password
-- **ID:** `github-token`
-- **Username:** Your GitHub username
-- **Password:** Personal Access Token (PAT)
-
-### 4. Create Pipeline Job
-
-1. **New Item → Pipeline**
-2. **Name:** `NBA-ML-Pipeline`
-3. **Pipeline section:**
-   - **Definition:** Pipeline script from SCM
-   - **SCM:** Git
-   - **Repository URL:** `https://github.com/aurelpow/nba-ml-pipeline.git`
-   - **Credentials:** Select `github-token`
-   - **Branches to build:** `*/dev`, `*/master`
-   - **Script Path:** `Jenkinsfile`
-
->>>>>>> f6e7fb6c92a7753df8bf2f8eaa1c049d8493b64f
 ---
 
 ## Triggering Pipelines
 
 ### Manual Trigger
-<<<<<<< HEAD
 1. Go to Jenkins dashboard
 2. Click on **NBA-ML-Pipeline**
 3. Click on the branch (e.g., **dev**)
@@ -238,30 +216,6 @@ NBA-ML-Pipeline (Multibranch Pipeline)
 - ✅ **Green** - Build successful, deployed to environment
 - ❌ **Red** - Build failed, check console output
 - ⏸️ **Gray** - Not built yet (no Jenkinsfile found)
-=======
-1. Go to your Jenkins job
-2. Click **"Build Now"**
-3. Select branch if multi-branch pipeline
-
-### Automatic Trigger (Poll SCM)
-
-Since Jenkins runs **locally behind your router/firewall**, GitHub cannot reach it for webhook triggers. You must use **Poll SCM** instead:
-
-1. **Configure Job → Build Triggers**
-2. **Enable "Poll SCM"**
-3. **Schedule:**
-   ```
-   H/5 * * * *
-   ```
-   (Checks GitHub every 5 minutes)
-
-4. **Save**
-
-**How it works:**
-- Jenkins polls GitHub every 5 minutes
-- Detects new commits on `dev` or `master`
-- Automatically triggers pipeline
->>>>>>> f6e7fb6c92a7753df8bf2f8eaa1c049d8493b64f
 
 **⚠️ Limitations:**
 - Your computer must be running for polling to work
@@ -389,7 +343,6 @@ gcloud compute instances create jenkins-server \
 
 ## Troubleshooting
 
-<<<<<<< HEAD
 ### No Branches Showing in Multibranch Pipeline
 **Symptom:** Multibranch pipeline created but no branches appear
 
@@ -415,8 +368,6 @@ gcloud compute instances create jenkins-server \
 - Keep only the multibranch pipeline
 - Disable "Poll SCM" on old jobs before deleting
 
-=======
->>>>>>> f6e7fb6c92a7753df8bf2f8eaa1c049d8493b64f
 ### Jenkins Not Starting
 ```bash
 # Check container status
@@ -445,7 +396,6 @@ gcloud builds submit --tag=us-central1-docker.pkg.dev/ml-nba-project/nba-docker-
 # Check Cloud Build logs in GCP Console
 ```
 
-<<<<<<< HEAD
 ### Periodic Scanning Not Working
 **Symptom:** Repository not being scanned automatically
 
@@ -454,12 +404,6 @@ gcloud builds submit --tag=us-central1-docker.pkg.dev/ml-nba-project/nba-docker-
 2. Enable "Periodically if not otherwise run"
 3. Set interval to `5 minutes`
 4. Check **"Scan Repository Log"** for scan history
-=======
-### Poll SCM Not Working
-- Verify GitHub repository URL is correct
-- Check Git Polling Log in Jenkins job
-- Ensure Docker container has internet access
->>>>>>> f6e7fb6c92a7753df8bf2f8eaa1c049d8493b64f
 
 ### "Permission Denied" on Scripts
 ```bash
