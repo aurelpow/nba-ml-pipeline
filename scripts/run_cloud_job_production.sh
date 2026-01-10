@@ -16,7 +16,11 @@ set -e  # Exit on any error
 
 # Load GCP configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/gcp_config.sh"
+if [ -f "${SCRIPT_DIR}/gcp_config.sh" ]; then
+    source "${SCRIPT_DIR}/gcp_config.sh"
+else
+    echo "⚠️  gcp_config.sh not found, relying on environment variables."
+fi
 
 JOB_NAME="nba-training-prod"
 
@@ -28,11 +32,15 @@ echo "   • Job: ${JOB_NAME}"
 echo ""
 echo "⚠️  WARNING: This will execute a PRODUCTION job!"
 echo ""
-read -p "Are you sure you want to continue? (yes/no): " confirm
 
-if [ "$confirm" != "yes" ]; then
-    echo "❌ Execution cancelled"
-    exit 0
+if [ -z "$CI" ] && [ -z "$JENKINS_URL" ]; then
+    read -p "Are you sure you want to continue? (yes/no): " confirm
+    if [ "$confirm" != "yes" ]; then
+        echo "❌ Execution cancelled"
+        exit 0
+    fi
+else
+    echo "⏭️  CI/CD environment detected: Skipping confirmation prompt"
 fi
 
 echo ""
@@ -65,13 +73,16 @@ EXECUTION_NAME=$(gcloud run jobs executions list \
 echo "   • Execution: ${EXECUTION_NAME}"
 echo ""
 
-# 📋 Show logs
 echo "📋 Showing logs (last 50 lines)..."
 echo "=================================================="
-gcloud run jobs executions logs "${EXECUTION_NAME}" \
-    --region="${REGION}" \
+
+# We use 'logging read' because it is stable and supports limits perfectly
+gcloud logging read "resource.type=cloud_run_job AND resource.labels.job_name=${JOB_NAME} AND resource.labels.location=${REGION}" \
     --project="${PROJECT_ID}" \
-    --limit=50
+    --limit=50 \
+    --format="value(textPayload)"
+echo ""
+echo "=================================================="
 
 echo ""
 echo "=================================================="

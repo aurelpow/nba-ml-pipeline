@@ -45,11 +45,15 @@ echo "=================================================="
 echo ""
 echo "⚠️  WARNING: This will delete the job '${JOB_NAME}'"
 echo ""
-read -p "Are you sure you want to continue? (yes/no): " confirm
 
-if [ "$confirm" != "yes" ]; then
-    echo "❌ Deletion cancelled"
-    exit 0
+if [ -z "$CI" ] && [ -z "$JENKINS_URL" ]; then
+    read -p "Are you sure you want to continue? (yes/no): " confirm
+    if [ "$confirm" != "yes" ]; then
+        echo "❌ Deletion cancelled"
+        exit 0
+    fi
+else
+    echo "⏭️  CI/CD environment detected: Skipping confirmation prompt"
 fi
 
 echo ""

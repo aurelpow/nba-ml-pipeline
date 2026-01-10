@@ -166,6 +166,15 @@ NBA_project_ML/
 ├── run_all.sh            # Orchestrates all processes via env-vars
 ├── requirements.txt      # Core Python dependencies
 ├── main.py               # CLI entrypoint for individual subprocesses
+├── scripts/              # Deployment and setup scripts
+│   ├── deploy_develop.sh
+│   ├── create_cloud_run_job_develop.sh
+│   ├── run_cloud_job_develop.sh
+│   ├── deploy_production.sh
+│   ├── create_cloud_run_job_production.sh
+│   ├── run_cloud_job_production.sh
+│   ├── setup_gcp_config.sh # Interactive GCP config setup
+│   └── gcp_config.sh.example # GCP config template
 ├── src/                  # Modular ETL and inference scripts
 │   ├── data_collectors/
 │   │   ├── get_nba_players.py
@@ -419,6 +428,43 @@ gcloud scheduler jobs create http nba-weekly-training \
 - **🩺 Injury-aware predictions**
 - **🌐 API Service**: Expose predictions via a REST API (FastAPI/Flask) for real-time applications.
 - **📊 Dashboard**: Build an interactive dashboard (Plotly Dash or Power BI) to visualize predictions and model performance.
+
+---
+
+## 🔄 CI/CD with Jenkins
+
+Automated deployment pipeline for continuous integration and delivery.
+
+### Current Setup (Local Jenkins)
+- **Location:** `jenkins/` directory
+- **Triggers:** Automatic on push to `dev`/`master` branches
+- **Deployment:** Builds Docker image → Artifact Registry → Cloud Run Jobs
+
+### Quick Start
+```bash
+cd jenkins
+docker-compose up -d
+# Access: http://localhost:8080
+```
+
+**Pipeline Flow:**
+```
+Push to dev/master → Jenkins Poll → Quality Check → Build & Deploy → Smoke Test
+```
+
+**Branch Mapping:**
+- `dev` → Develop environment (`develop` image tag)
+- `master` → Production environment (`latest` image tag)
+
+### 📚 Full Documentation
+See [jenkins/README.md](jenkins/README.md) for:
+- Complete setup instructions
+- Credential configuration
+- Production deployment options (GitHub Actions, Cloud Build, GCE)
+- Cost comparisons
+- Troubleshooting guide
+
+---
 
 ## 🚀 Quick Start
 

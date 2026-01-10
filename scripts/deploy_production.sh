@@ -10,7 +10,11 @@ set -e  # Exit on any error
 
 # Load GCP configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/gcp_config.sh"
+if [ -f "${SCRIPT_DIR}/gcp_config.sh" ]; then
+    source "${SCRIPT_DIR}/gcp_config.sh"
+else
+    echo "⚠️  gcp_config.sh not found, relying on environment variables."
+fi
 
 echo "=================================================="
 echo "🔧 DEPLOY TO PRODUCTION ENVIRONMENT"
@@ -18,24 +22,26 @@ echo "=================================================="
 echo ""
 echo "⚠️  WARNING: This will deploy to PRODUCTION!"
 echo ""
-read -p "Are you sure you want to continue? (yes/no): " confirm
-
-if [ "$confirm" != "yes" ]; then
-    echo "❌ Deployment cancelled"
-    exit 0
+if [ -z "$CI" ] && [ -z "$JENKINS_URL" ]; then
+    read -p "Are you sure you want to continue? (yes/no): " confirm
+    if [ "$confirm" != "yes" ]; then
+        echo "❌ Deployment cancelled"
+        exit 0
+    fi
+else
+    echo "⏭️  CI/CD environment detected: Skipping confirmation prompt"
 fi
 
-# 🔄 1. Sync with GitHub
-echo "📥 Step 1: Syncing with GitHub..."
-echo "   • Branch: ${PROD_BRANCH}"
-echo "   • Directory: ${PROJECT_DIR}"
-cd "${PROJECT_DIR}" || { echo "❌ Directory not found: ${PROJECT_DIR}"; exit 1; }
-
-git fetch origin
-git reset --hard "origin/${PROD_BRANCH}"
-
-echo "✅ Code synced with main branch"
-echo ""
+# 🔄 1. Sync with GitHub (skip if in Jenkins)
+# 🔄 1. Sync with GitHub (skip if in Jenkins)
+if [ -z "$JENKINS_URL" ]; then
+    echo "📥 Syncing with GitHub (Local Mode)..."
+    cd "${PROJECT_DIR}"
+    git fetch origin
+    git reset --hard "origin/${PROD_BRANCH}"
+else
+    echo "⏭️ Jenkins detected: Skipping Git Sync"
+fi
 
 # 🧩 2. Define variables for PRODUCTION environment
 echo "🧩 Step 2: Setting up environment variables..."
