@@ -61,10 +61,10 @@ pipeline {
         }
 
         stage('Deploy & Create Job') {
-            // We deploy if we are on master, dev, or your current integration branch
+            // We deploy if we are on master or dev
             when {
                 expression { 
-                    return (CLEAN_BRANCH == 'master' || CLEAN_BRANCH == 'dev' || CLEAN_BRANCH == 'feature/jenkins-integration' || CLEAN_BRANCH == 'jenkins-integration')
+                    return (CLEAN_BRANCH == 'master' || CLEAN_BRANCH == 'dev')
                 }
             }
             steps {
@@ -82,7 +82,7 @@ pipeline {
         stage('Smoke Test') {
             when {
                 expression { 
-                    return (CLEAN_BRANCH == 'master' || CLEAN_BRANCH == 'dev' || CLEAN_BRANCH.contains('jenkins-integration'))
+                    return (CLEAN_BRANCH == 'master' || CLEAN_BRANCH == 'dev')
                 }
             }
             steps {

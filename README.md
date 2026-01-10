@@ -429,6 +429,43 @@ gcloud scheduler jobs create http nba-weekly-training \
 - **🌐 API Service**: Expose predictions via a REST API (FastAPI/Flask) for real-time applications.
 - **📊 Dashboard**: Build an interactive dashboard (Plotly Dash or Power BI) to visualize predictions and model performance.
 
+---
+
+## 🔄 CI/CD with Jenkins
+
+Automated deployment pipeline for continuous integration and delivery.
+
+### Current Setup (Local Jenkins)
+- **Location:** `jenkins/` directory
+- **Triggers:** Automatic on push to `dev`/`master` branches
+- **Deployment:** Builds Docker image → Artifact Registry → Cloud Run Jobs
+
+### Quick Start
+```bash
+cd jenkins
+docker-compose up -d
+# Access: http://localhost:8080
+```
+
+**Pipeline Flow:**
+```
+Push to dev/master → Jenkins Poll → Quality Check → Build & Deploy → Smoke Test
+```
+
+**Branch Mapping:**
+- `dev` → Develop environment (`develop` image tag)
+- `master` → Production environment (`latest` image tag)
+
+### 📚 Full Documentation
+See [jenkins/README.md](jenkins/README.md) for:
+- Complete setup instructions
+- Credential configuration
+- Production deployment options (GitHub Actions, Cloud Build, GCE)
+- Cost comparisons
+- Troubleshooting guide
+
+---
+
 ## 🚀 Quick Start
 
 ### 1. Configure Google Cloud Platform
