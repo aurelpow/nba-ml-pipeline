@@ -56,10 +56,14 @@ echo ""
 # 📋 Show logs
 echo "📋 Showing logs (last 50 lines)..."
 echo "=================================================="
-gcloud run jobs executions logs "${EXECUTION_NAME}" \
-    --region="${REGION}" \
+
+# We use 'logging read' because it is stable and supports limits perfectly
+gcloud logging read "resource.type=cloud_run_job AND resource.labels.job_name=${JOB_NAME} AND resource.labels.location=${REGION}" \
     --project="${PROJECT_ID}" \
-    --limit=50
+    --limit=50 \
+    --format="value(textPayload)"
+echo ""
+echo "=================================================="
 
 echo ""
 echo "=================================================="
