@@ -15,9 +15,12 @@ else
 fi
 
 # Parse arguments (override config if provided)
-TUNE_PARAMS="${1:-${TUNE_PARAMS:-true}}"
+TUNE_PARAMS="${1:-${TUNE_PARAMS:-false}}"
+
+# Job name
 JOB_NAME="nba-training-prod"
 
+# Define targets and model directory
 TARGETS="${TARGETS:-points fantasy_points}"
 MODEL_PATH="gs://${BUCKET_NAME}/${MODELS_FOLDER}/prod"
 
@@ -29,6 +32,10 @@ echo "📦 Job Configuration:"
 echo "   • Name: ${JOB_NAME}"
 echo "   • Targets: ${TARGETS}"
 echo "   • Model Path: ${MODEL_PATH}"
+echo "   • Tune Params: ${TUNE_PARAMS}"
+echo "   • Region: ${REGION}"
+echo "   • Image: ${PROD_IMAGE_URI}"
+echo "   • Service Account: ${SERVICE_ACCOUNT}"
 echo ""
 
 # 🚀 Create or Update Cloud Run Job
@@ -74,13 +81,13 @@ echo "=================================================="
 echo ""
 echo "📋 Job Summary:"
 echo "   • Job Name: ${JOB_NAME}"
-echo "   • Environment: DEVELOP"
+echo "   • Environment: PRODUCTION"
 echo "   • Trains: Points + Fantasy Points"
 echo "   • Tuning: ${TUNE_PARAMS}"
 echo "   • Season: ${SEASON} (${SEASON_TYPE})"
 echo ""
 echo "🚀 Execute job:"
-echo "   ./scripts/run_cloud_job_develop.sh"
+echo "   ./scripts/run_cloud_job_production.sh"
 echo ""
 echo "🔍 Monitor job execution:"
 echo "   gcloud run jobs executions list --job=${JOB_NAME} --region=${REGION}"

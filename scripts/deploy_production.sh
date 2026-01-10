@@ -22,45 +22,25 @@ echo "=================================================="
 echo ""
 echo "⚠️  WARNING: This will deploy to PRODUCTION!"
 echo ""
-if [ -z "$CI" ] && [ -z "$JENKINS_URL" ]; then
-    read -p "Are you sure you want to continue? (yes/no): " confirm
-    if [ "$confirm" != "yes" ]; then
-        echo "❌ Deployment cancelled"
-        exit 0
-    fi
-else
-    echo "⏭️  CI/CD environment detected: Skipping confirmation prompt"
-fi
 
-# 🔄 1. Sync with GitHub (skip if in Jenkins)
 # 🔄 1. Sync with GitHub (skip if in Jenkins)
 if [ -z "$JENKINS_URL" ]; then
     echo "📥 Syncing with GitHub (Local Mode)..."
     cd "${PROJECT_DIR}"
     git fetch origin
-    git reset --hard "origin/${PROD_BRANCH}"
+    git reset --hard "origin/${DEV_BRANCH}"
 else
     echo "⏭️ Jenkins detected: Skipping Git Sync"
 fi
 
-# 🧩 2. Define variables for PRODUCTION environment
-echo "🧩 Step 2: Setting up environment variables..."
-
-export PROJECT_ID="ml-nba-project"
-export REGION="us-central1"
-export REPO="nba-docker-repo"
-export IMAGE="nba_project"
-export ENVIRONMENT="production"
-
-# Build image URI with latest tag
-export IMAGE_URI="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO}/${IMAGE}"
-
+# 🧩 2. Display environment variables
+echo "🧩 Step 2: Using environment configuration..."
 echo "   📦 Project: ${PROJECT_ID}"
 echo "   🌍 Region: ${REGION}"
-echo "   📂 Repository: ${REPO}"
-echo "   🏷️  Image: ${IMAGE}"
-echo "   🔖 Tag: latest"
-echo "   🎯 Full URI: ${IMAGE_URI}:latest"
+echo "   📂 Repository: ${REPO_NAME}"
+echo "   🏷️  Image: ${IMAGE_NAME}"
+echo "   🔖 Tag: ${PROD_IMAGE_TAG}"
+echo "   🎯 Full URI: ${PROD_IMAGE_URI}"
 echo ""
 
 # 🔐 3. Authenticate Docker (if needed)
@@ -76,7 +56,7 @@ echo "   ⏳ This may take several minutes..."
 echo ""
 
 gcloud builds submit \
-  --tag "${IMAGE_URI}:latest" \
+  --tag "${PROD_IMAGE_URI}" \
   --project "${PROJECT_ID}" \
   --timeout=20m
 
@@ -91,5 +71,5 @@ echo "   • Branch: ${PROD_BRANCH}"
 echo "   • Image: ${PROD_IMAGE_URI}"
 echo ""
 echo "🔍 To verify your image:"
-echo "   gcloud artifacts docker images list ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO} --filter='package=${IMAGE}'"
+echo "   gcloud artifacts docker images list ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME} --filter='package=${IMAGE_NAME}'"
 echo ""
