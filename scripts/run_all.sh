@@ -46,6 +46,15 @@ trap 'echo "[ERROR $(ts)] Failed at line $LINENO"; exit 1' ERR
 
 log "▶️ Running all processes for season=$SEASON, date=$DATE (season_type=$SEASON_TYPE, save_mode=$SAVE_MODE)"
 
+# ── Proxy pre-flight (always runs; prints diagnostics, never blocks) ────────
+if [ -n "${NBA_PROXY_USER:-}" ] && [ -n "${NBA_PROXY_PASS:-}" ]; then
+  log "🔍 Running proxy pre-flight check..."
+  python scripts/test_proxy.py || log "⚠️  Proxy pre-flight reported issues – check logs above"
+else
+  log "⚠️  NBA_PROXY_USER / NBA_PROXY_PASS not set – skipping proxy pre-flight"
+fi
+# ────────────────────────────────────────────────────────────────────────────
+
 log "➡️ Running get_nba_players..."
 python main.py -p get_nba_players -s "$SEASON" -sm "$SAVE_MODE"
 log "✅ Finished get_nba_players"

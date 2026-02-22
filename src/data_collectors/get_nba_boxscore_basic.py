@@ -7,8 +7,9 @@ from nba_api.stats.endpoints import boxscoretraditionalv3
 from nba_api.stats.library.parameters import LeagueID
 
 from common.io_utils import save_database, load_data, BoxscoreFileName, ScheduleFileName
-from common.constants import  nba_api_timeout
+from common.constants import nba_api_timeout
 from common.singleton_meta import SingletonMeta
+from common.utils import build_proxy_url, call_nba_api_with_retry
 
 class BoxscoreGames(metaclass=SingletonMeta):
     """
@@ -28,11 +29,8 @@ class BoxscoreGames(metaclass=SingletonMeta):
         self.current_season: str = current_season
         self.current_season_year: int = int(current_season.split("-")[0])
         self.SAVE_MODE: str = save_mode
-        # Build proxy string only if not running locally
-        if self.SAVE_MODE != "local" and proxy_user and proxy_pass:
-            self.proxy: str = f"http://{proxy_user}:{proxy_pass}@gate.decodo.com:10001"
-        else:
-            self.proxy: str = None
+        self.proxy: str | None = build_proxy_url(proxy_user, proxy_pass)
+        print(f"[PROXY] boxscore_basic → {'enabled' if self.proxy else 'disabled (no creds)'}")
 
     def get_schedule(self) -> pd.DataFrame:
         """
@@ -98,19 +96,18 @@ class BoxscoreGames(metaclass=SingletonMeta):
             pd.DataFrame: The boxscore DataFrame for the game or an empty DataFrame on error.
         """
         try:
-            # Increase timeout if needed (here, timeout=1 second)
-            boxscore: pd.DataFrame = boxscoretraditionalv3.BoxScoreTraditionalV3(
-                game_id=game_id, 
-                proxy=proxy_arg,
-                timeout=nba_api_timeout
-            ).get_data_frames()[0]
+            boxscore: pd.DataFrame = call_nba_api_with_retry(
+                lambda: boxscoretraditionalv3.BoxScoreTraditionalV3(
+                    game_id=game_id,
+                    proxy=proxy_arg,
+                    timeout=nba_api_timeout,
+                ).get_data_frames()[0]
+            )
             print(f"Fetched boxscore for game ID {game_id}")
-
             return boxscore
-        
         except Exception as e:
             print(f"Error fetching boxscore for game ID {game_id}: {e}")
-            return pd.DataFrame() 
+            return pd.DataFrame()
 
     def get_boxscore_data(self, schedule_df: pd.DataFrame) -> pd.DataFrame:
         """

@@ -1,10 +1,23 @@
 # cloudbuild.yaml
+substitutions:
+  _IMAGE: 'us-central1-docker.pkg.dev/ml-nba-project/nba-docker-repo/nba_project'
+
 steps:
   - name: 'gcr.io/cloud-builders/docker'
-    args: [
-      'build',
-      '-t', 'us-central1-docker.pkg.dev/ml-nba-project/nba-docker-repo/nba_project',
-      '.'
-    ]
+    entrypoint: 'bash'
+    args: ['-c', 'docker pull ${_IMAGE}:latest || true']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '--cache-from'
+      - '${_IMAGE}:latest'
+      - '-t'
+      - '${_IMAGE}:${SHORT_SHA}'
+      - '-t'
+      - '${_IMAGE}:latest'
+      - '.'
+
 images:
-  - 'us-central1-docker.pkg.dev/ml-nba-project/nba-docker-repo/nba_project'
+  - '${_IMAGE}:${SHORT_SHA}'
+  - '${_IMAGE}:latest'

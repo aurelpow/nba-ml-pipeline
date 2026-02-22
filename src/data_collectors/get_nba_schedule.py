@@ -4,7 +4,8 @@ from nba_api.stats.endpoints import scheduleleaguev2
 from nba_api.stats.library.parameters import LeagueID
 from common.singleton_meta import SingletonMeta
 from common.io_utils import ScheduleFileName, save_database
-from common.constants import  nba_api_timeout
+from common.constants import nba_api_timeout
+from common.utils import build_proxy_url, call_nba_api_with_retry
 
 
 class ScheduleData(metaclass=SingletonMeta):
@@ -24,11 +25,8 @@ class ScheduleData(metaclass=SingletonMeta):
         """
         self.current_season: str = current_season
         self.SAVE_MODE: str = save_mode
-        # Build proxy string only if not running locally
-        if self.SAVE_MODE != "local" and proxy_user and proxy_pass:
-            self.proxy: str = f"http://{proxy_user}:{proxy_pass}@gate.decodo.com:10001"
-        else:
-            self.proxy: str = None
+        self.proxy: str | None = build_proxy_url(proxy_user, proxy_pass)
+        print(f"[PROXY] schedule → {'enabled' if self.proxy else 'disabled (no creds)'}")
 
     
     def get_schedule_from_api(self) -> pd.DataFrame:
@@ -38,14 +36,15 @@ class ScheduleData(metaclass=SingletonMeta):
         Returns:
             pd.DataFrame: A DataFrame with the NBA shedule for the current season. 
         """
-        # Use the ScheduleLeagueV2 endpoint to get the schedule for the current season
-        scheduleleaguev2_df: pd.DataFrame = scheduleleaguev2.ScheduleLeagueV2(
-            league_id=LeagueID.nba,
-            season=self.current_season,
-            proxy=self.proxy,
-            timeout=nba_api_timeout
-        ).get_data_frames()[0]
-
+        # Use the ScheduleLeagueV2 endpoint – wrapped with transient-error retry
+        scheduleleaguev2_df: pd.DataFrame = call_nba_api_with_retry(
+            lambda: scheduleleaguev2.ScheduleLeagueV2(
+                league_id=LeagueID.nba,
+                season=self.current_season,
+                proxy=self.proxy,
+                timeout=nba_api_timeout,
+            ).get_data_frames()[0]
+        )
         return scheduleleaguev2_df
     
     @staticmethod

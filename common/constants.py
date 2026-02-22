@@ -3,11 +3,11 @@ This module contains common utility constants for NBA data processing.
 """
 
 # Nba api timeout
-nba_api_timeout: int = 20 
+nba_api_timeout: int = 60   # increased from 20 – proxy adds latency
 # Number of retries for nba api requests
 max_retries: int = 3
 # Delay between retries in seconds
-retry_delay: int = 5
+retry_delay: int = 10
 
 # key statistics for points ML models
 key_stats_points: dict[str, str] = {
