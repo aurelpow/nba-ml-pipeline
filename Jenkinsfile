@@ -4,6 +4,7 @@ pipeline {
     options {
         timeout(time: 30, unit: 'MINUTES')
         ansiColor('xterm')
+        durabilityHint('PERFORMANCE_OPTIMIZED')
     }
 
     environment {
@@ -14,12 +15,13 @@ pipeline {
         CLEAN_BRANCH = "${RAW_BRANCH.split('/')[-1]}"
         
         // 2. ENVIRONMENT MAPPING
-        // If branch is master/main -> production. Otherwise -> develop.
+        // If branch is master/main -> production. Hotfix/develop -> develop.
         ENV_SUFFIX = "${(CLEAN_BRANCH == 'master' || CLEAN_BRANCH == 'main') ? 'production' : 'develop'}"
         
         // 3. CREDENTIAL IDs (Must match Jenkins UI)
         GCP_CREDS_ID = 'gcp-service-account-key' 
         GCP_CONFIG_ID = 'gcp-config-sh'
+        PIP_CACHE_DIR = "${WORKSPACE}/.pip-cache"
     }
 
     stages {
@@ -51,20 +53,20 @@ pipeline {
         stage('Quality Check') {
             steps {
                 sh """#!/bin/bash
-                    python3 -m venv venv
-                    source venv/bin/activate
-                    pip install flake8
+                    mkdir -p ${PIP_CACHE_DIR}
+                    python3 -m pip install --upgrade pip
+                    python3 -m pip install --cache-dir ${PIP_CACHE_DIR} flake8
                     # || true ensures we don't fail the build on style warnings for now
-                    flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics || true
+                    python3 -m flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics || true
                 """
             }
         }
 
         stage('Deploy & Create Job') {
-            // We deploy if we are on master or dev
+            // Deploy on master, dev, or any hotfix branch
             when {
                 expression { 
-                    return (CLEAN_BRANCH == 'master' || CLEAN_BRANCH == 'dev')
+                    return (CLEAN_BRANCH == 'master' || CLEAN_BRANCH == 'dev' || CLEAN_BRANCH.startsWith('hotfix-'))
                 }
             }
             steps {
@@ -82,7 +84,7 @@ pipeline {
         stage('Smoke Test') {
             when {
                 expression { 
-                    return (CLEAN_BRANCH == 'master' || CLEAN_BRANCH == 'dev')
+                    return (CLEAN_BRANCH == 'master' || CLEAN_BRANCH == 'dev' || CLEAN_BRANCH.startsWith('hotfix-'))
                 }
             }
             steps {

@@ -1,10 +1,11 @@
 import pandas as pd
+from urllib.parse import quote
 
 from nba_api.stats.endpoints import scheduleleaguev2
 from nba_api.stats.library.parameters import LeagueID
 from common.singleton_meta import SingletonMeta
 from common.io_utils import ScheduleFileName, save_database
-from common.constants import  nba_api_timeout
+from common.constants import nba_api_timeout
 
 
 class ScheduleData(metaclass=SingletonMeta):
@@ -24,11 +25,15 @@ class ScheduleData(metaclass=SingletonMeta):
         """
         self.current_season: str = current_season
         self.SAVE_MODE: str = save_mode
-        # Build proxy string only if not running locally
-        if self.SAVE_MODE != "local" and proxy_user and proxy_pass:
-            self.proxy: str = f"http://{proxy_user}:{proxy_pass}@gate.decodo.com:10001"
+        # Build proxy string – URL-encode creds to handle special characters
+        if proxy_user and proxy_pass:
+            _u = quote(proxy_user, safe="")
+            _p = quote(proxy_pass, safe="")
+            self.proxy: str = f"http://{_u}:{_p}@gate.decodo.com:10001"
+            print(f"[PROXY] Using proxy for schedule (user={proxy_user[:4]}***)")
         else:
             self.proxy: str = None
+            print("[PROXY] No proxy credentials provided – connecting directly")
 
     
     def get_schedule_from_api(self) -> pd.DataFrame:
