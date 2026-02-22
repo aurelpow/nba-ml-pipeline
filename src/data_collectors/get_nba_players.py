@@ -4,7 +4,8 @@ from nba_api.stats.endpoints import playerindex
 
 from common.singleton_meta import SingletonMeta
 from common.io_utils import PlayersFileName, save_database
-from common.constants import  nba_api_timeout
+from common.constants import nba_api_timeout
+from common.utils import build_proxy_url, call_nba_api_with_retry
 
 
 
@@ -27,13 +28,10 @@ class NbaPlayersData(metaclass=SingletonMeta):
                 proxy_user (str, optional): Proxy username if needed. Defaults to None.
                 proxy_user (str, optional): Proxy password if needed. Defaults to None.
         """
-        self.current_season: str = current_season  # e.g., "2024-25""
+        self.current_season: str = current_season  # e.g., "2024-25"
         self.SAVE_MODE: str = save_mode
-        # Build proxy string only if not running locally
-        if self.SAVE_MODE != "local" and proxy_user and proxy_pass:
-            self.proxy: str = f"http://{proxy_user}:{proxy_pass}@gate.decodo.com:10001"
-        else:
-            self.proxy: str = None
+        self.proxy: str | None = build_proxy_url(proxy_user, proxy_pass)
+        print(f"[PROXY] players → {'enabled' if self.proxy else 'disabled (no creds)'}")
   
     def get_nba_players_index(self) -> pd.DataFrame:
         """
@@ -41,10 +39,13 @@ class NbaPlayersData(metaclass=SingletonMeta):
         """
         # Get a list of all NBA teams (each team is represented as a dictionary)
         print("Fetching Active NBA players data from API...")
-        playerindex_df: pd.DataFrame =  playerindex.PlayerIndex(season=self.current_season,
-                                                                proxy= self.proxy,
-                                                                timeout= nba_api_timeout
-                                                                ).get_data_frames()[0]
+        playerindex_df: pd.DataFrame = call_nba_api_with_retry(
+            lambda: playerindex.PlayerIndex(
+                season=self.current_season,
+                proxy=self.proxy,
+                timeout=nba_api_timeout,
+            ).get_data_frames()[0]
+        )
 
         # Select relevant columns 
         playerindex_df = playerindex_df[
