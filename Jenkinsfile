@@ -61,6 +61,15 @@ pipeline {
                 """
             }
         }
+        
+        stage('Unit Tests') {
+            steps {
+                sh """#!/bin/bash
+                    python3 -m pip install --cache-dir ${PIP_CACHE_DIR} -r requirements.txt
+                    python3 -m pytest tests/ -v --tb=short
+                """
+            }
+        }
 
         stage('Deploy & Create Job') {
             // Deploy on master, dev, or any hotfix branch

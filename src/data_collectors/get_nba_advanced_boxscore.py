@@ -17,21 +17,23 @@ class AdvancedBoxscoreGames(metaclass=SingletonMeta):
     A class to fetch and NBA advanced boxscore data for all games in a specific season.
     """
 
-    def __init__(self, current_season: str, save_mode: str, 
-                 proxy_user: str = None, proxy_pass: str = None) -> None:
+    def __init__(self, current_season: str, 
+                 save_mode: str, 
+                 proxy_user: str | None = None, 
+                 proxy_pass: str | None = None) -> None:
         """
         Initialize the AdvancedBoxscoreGames class with the current season and season type.
             Args:
                 current_season (str): The current season in the format "YYYY-YY".
                 save_mode (str): The mode to save data, either 'local' or 'bq' (google bigquery). 
-                proxy_user (str, optional): Proxy username if needed. Defaults to None.
-                proxy_user (str, optional): Proxy password if needed. Defaults to None.
+                proxy_user (str | None, optional): Proxy username if needed. Defaults to None.
+                proxy_pass (str | None, optional): Proxy password if needed. Defaults to None.
         """
         print(f"Initializing AdvancedBoxscoreGames with season: {current_season}")
         self.current_season: str = current_season
         self.current_season_year: int = int(current_season.split("-")[0])
         self.SAVE_MODE: str = save_mode
-        self.proxy: str | None = build_proxy_url(proxy_user, proxy_pass)
+        self.proxy: str | None = build_proxy_url(proxy_user, proxy_pass) if proxy_user and proxy_pass else None
         print(f"[PROXY] advanced_boxscore → {'enabled' if self.proxy else 'disabled (no creds)'}")
 
     def get_schedule(self) -> pd.DataFrame:
