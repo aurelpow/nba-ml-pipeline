@@ -391,12 +391,9 @@ class UnifiedPredictor(metaclass=SingletonMeta):
         )
         logger.info("Predictions persisted successfully!")
 
-    def run(self) -> pd.DataFrame:
+    def run(self) ->None:
         """
         Execute complete prediction pipeline: read → transform → predict → persist.
-
-        Returns:
-            DataFrame with predictions
         """
         try:
             logger.info(f"Starting prediction pipeline for {self.target}...")
@@ -423,7 +420,6 @@ class UnifiedPredictor(metaclass=SingletonMeta):
             )
 
             logger.info("Prediction pipeline completed successfully!")
-            return predictions_df
 
         except Exception as e:
             logger.error(f"Prediction pipeline failed: {str(e)}")

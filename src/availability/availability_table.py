@@ -12,7 +12,7 @@ Output schema (one row per player per game date):
     team_id          : int   (NBA team ID, joined from players table)
     person_id        : int   (NBA player ID, joined from players table)
     player_slug      : str
-    player_name_raw  : str   (Lastname,Firstname as in the PDF)
+    player_name      : str   (human-readable display name, e.g. "LeBron James")
     raw_status       : str   (original PDF string)
     status           : str   (canonical: Out|Doubtful|Questionable|Probable|Available)
     reason           : str   (injury description)
@@ -221,7 +221,20 @@ class AvailabilityTableBuilder(metaclass=SingletonMeta):
         all_players_base["report_date"] = self.report_date.strftime("%m/%d/%Y")
         all_players_base["matchup"] = ""
         all_players_base["team"] = all_players_base["team_abbreviation"]
-        all_players_base["player_name"] = all_players_base["player_name_key"]
+        # Use human-readable "First Last" name for healthy baseline rows so
+        # formatting is consistent with injured rows (which carry the raw PDF name).
+        # player_name_key (LAST,FIRST uppercase) is kept only as an internal join key.
+        if {"player_first_name", "player_last_name"}.issubset(all_players_base.columns):
+            all_players_base["player_name"] = (
+                all_players_base["player_first_name"].fillna("").astype(str).str.strip()
+                + " "
+                + all_players_base["player_last_name"]
+                .fillna("")
+                .astype(str)
+                .str.strip()
+            ).str.strip()
+        else:
+            all_players_base["player_name"] = all_players_base["player_name_key"]
         all_players_base["raw_status"] = "Available"
         all_players_base["status"] = "Available"
         all_players_base["reason"] = ""
