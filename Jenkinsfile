@@ -22,6 +22,9 @@ pipeline {
         GCP_CREDS_ID = 'gcp-service-account-key' 
         GCP_CONFIG_ID = 'gcp-config-sh'
         PIP_CACHE_DIR = "${WORKSPACE}/.pip-cache"
+        VENV_DIR      = "${WORKSPACE}/.venv"
+        PY            = "${WORKSPACE}/.venv/bin/python3"
+        PIP           = "${WORKSPACE}/.venv/bin/pip"
     }
 
     stages {
@@ -35,29 +38,37 @@ pipeline {
                     file(credentialsId: "${GCP_CREDS_ID}", variable: 'GCP_KEY'),
                     file(credentialsId: "${GCP_CONFIG_ID}", variable: 'SECURE_CONFIG')
                 ]) {
-                    sh """#!/bin/bash
+                    sh '''#!/bin/bash
                         # Inject the secret config into the expected script location
                         mkdir -p scripts
-                        cp ${SECURE_CONFIG} scripts/gcp_config.sh
+                        cp "$SECURE_CONFIG" scripts/gcp_config.sh
                         chmod +x scripts/*.sh
-                        
+
                         # Authenticate
                         source scripts/gcp_config.sh
-                        gcloud auth activate-service-account --key-file=${GCP_KEY} --quiet
-                        gcloud config set project \$PROJECT_ID --quiet
-                    """
+                        gcloud auth activate-service-account --key-file="$GCP_KEY" --quiet
+                        gcloud config set project "$PROJECT_ID" --quiet
+                    '''
                 }
+            }
+        }
+
+        stage('Setup Python') {
+            steps {
+                sh """#!/bin/bash
+                    python3 -m venv ${VENV_DIR}
+                    ${PIP} install --upgrade pip --quiet
+                    ${PIP} install --cache-dir ${PIP_CACHE_DIR} -r requirements.txt --quiet
+                """
             }
         }
 
         stage('Quality Check') {
             steps {
                 sh """#!/bin/bash
-                    mkdir -p ${PIP_CACHE_DIR}
-                    python3 -m pip install --upgrade pip
-                    python3 -m pip install --cache-dir ${PIP_CACHE_DIR} flake8
+                    ${PIP} install --cache-dir ${PIP_CACHE_DIR} flake8 --quiet
                     # || true ensures we don't fail the build on style warnings for now
-                    python3 -m flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics || true
+                    ${VENV_DIR}/bin/flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics || true
                 """
             }
         }
@@ -65,17 +76,16 @@ pipeline {
         stage('Unit Tests') {
             steps {
                 sh """#!/bin/bash
-                    python3 -m pip install --cache-dir ${PIP_CACHE_DIR} -r requirements.txt
-                    python3 -m pytest tests/ -v --tb=short
+                    ${PY} -m pytest tests/ -v --tb=short
                 """
             }
         }
 
         stage('Deploy & Create Job') {
-            // Deploy on master, dev, or any hotfix branch
+            // Deploy on master, dev, hotfix, or any feature branch
             when {
-                expression { 
-                    return (CLEAN_BRANCH == 'master' || CLEAN_BRANCH == 'dev' || CLEAN_BRANCH.startsWith('hotfix-'))
+                expression {
+                    return (CLEAN_BRANCH == 'master' || CLEAN_BRANCH == 'dev' || RAW_BRANCH.contains('hotfix-') || RAW_BRANCH.contains('feature/'))
                 }
             }
             steps {
@@ -91,9 +101,10 @@ pipeline {
         }
 
         stage('Smoke Test') {
+            // Run on master, dev, hotfix, or any feature branch
             when {
-                expression { 
-                    return (CLEAN_BRANCH == 'master' || CLEAN_BRANCH == 'dev' || CLEAN_BRANCH.startsWith('hotfix-'))
+                expression {
+                    return (CLEAN_BRANCH == 'master' || CLEAN_BRANCH == 'dev' || RAW_BRANCH.contains('hotfix-') || RAW_BRANCH.contains('feature/'))
                 }
             }
             steps {
