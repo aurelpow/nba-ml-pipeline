@@ -25,17 +25,6 @@ PY
 )"
 fi
 
-# If DATE not provided, use "today" in Europe/Madrid
-if [ -z "${DATE:-}" ]; then
-  DATE="$(python - <<'PY'
-from datetime import datetime
-from zoneinfo import ZoneInfo
-z = ZoneInfo("Europe/Madrid")
-print(datetime.now(z).date().isoformat())
-PY
-)"
-fi
-
 # ---- helpers ----
 ts() { date -u +"%Y-%m-%dT%H:%M:%SZ"; }
 log() { echo "[$(ts)] $*"; }
@@ -74,6 +63,14 @@ log "✅ Finished get_nba_boxscore_basic"
 log "➡️ Running get_nba_advanced_boxscore..."
 python main.py -p get_nba_advanced_boxscore -s "$SEASON" -st "$SEASON_TYPE" -sm "$SAVE_MODE"
 log "✅ Finished get_nba_advanced_boxscore"
+
+log "➡️ Running get_injury_report..."
+python main.py -p get_injury_report -sm "$SAVE_MODE" -d "$DATE"
+log "✅ Finished get_injury_report"
+
+log "➡️ Running compute_availability..."
+python main.py -p compute_availability -sm "$SAVE_MODE" -d "$DATE"
+log "✅ Finished compute_availability"
 
 log "➡️ Running train..."
 # Convert space-separated targets to individual arguments

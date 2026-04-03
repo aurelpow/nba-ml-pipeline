@@ -3,12 +3,20 @@ import argparse
 import os
 import sys
 import logging
+from io import TextIOWrapper
 
 # Force UTF-8 stdout/stderr on Windows so emoji in print() don't crash.
-if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf8"):
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-if sys.stderr.encoding and sys.stderr.encoding.lower() not in ("utf-8", "utf8"):
-    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+def _force_utf8_stream(stream: object) -> None:
+    if not isinstance(stream, TextIOWrapper):
+        return
+
+    encoding = stream.encoding or ""
+    if encoding.lower() not in ("utf-8", "utf8"):
+        stream.reconfigure(encoding="utf-8", errors="replace")
+
+
+_force_utf8_stream(sys.stdout)
+_force_utf8_stream(sys.stderr)
 
 from src.data_collectors.get_nba_boxscore_basic import BoxscoreGames
 from src.data_collectors.get_nba_players import NbaPlayersData
