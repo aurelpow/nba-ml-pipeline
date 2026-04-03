@@ -13,19 +13,21 @@ class ScheduleData(metaclass=SingletonMeta):
     A class to fetch and update NBA schedule data. 
     """
 
-    def __init__(self, current_season: str, save_mode: str,
-                proxy_user:str = None, proxy_pass: str = None) -> None: 
+    def __init__(self, 
+                 current_season: str, save_mode: str,
+                proxy_user: str | None = None, 
+                proxy_pass: str | None = None) -> None: 
         """
         Initialize the NBA schedule data for a given season
             Args:
             current_season (str) : The season to fetch players for, e.g., "2024-25" 
             save_mode (str): Where to save the output ('bq' or 'local')
-            proxy_user (str, optional): Proxy username if needed. Defaults to None.
-            proxy_user (str, optional): Proxy password if needed. Defaults to None.
+            proxy_user (str | None, optional): Proxy username if needed. Defaults to None.
+            proxy_pass (str | None, optional): Proxy password if needed. Defaults to None.
         """
         self.current_season: str = current_season
         self.SAVE_MODE: str = save_mode
-        self.proxy: str | None = build_proxy_url(proxy_user, proxy_pass)
+        self.proxy: str | None = build_proxy_url(proxy_user, proxy_pass) if proxy_user and proxy_pass else None
         print(f"[PROXY] schedule → {'enabled' if self.proxy else 'disabled (no creds)'}")
 
     

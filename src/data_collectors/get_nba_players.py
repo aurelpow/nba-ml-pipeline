@@ -8,7 +8,6 @@ from common.constants import nba_api_timeout
 from common.utils import build_proxy_url, call_nba_api_with_retry
 
 
-
 class NbaPlayersData(metaclass=SingletonMeta):
     """
     Simple process:
@@ -18,21 +17,30 @@ class NbaPlayersData(metaclass=SingletonMeta):
     - Save with save_database like your other processes
     """
 
-    def __init__(self, current_season: str, save_mode: str,
-                    proxy_user: str = None, proxy_pass: str = None) -> None:
+    def __init__(
+        self,
+        current_season: str,
+        save_mode: str,
+        proxy_user: str | None = None,
+        proxy_pass: str | None = None,
+    ) -> None:
         """
         Initialize the NBA players data for a given season
             Args:
-                current_season (str) : The season to fetch players for, e.g., "2024-25" 
+                current_season (str) : The season to fetch players for, e.g., "2024-25"
                 save_mode (str): Where to save the output ('bq' or 'local')
                 proxy_user (str, optional): Proxy username if needed. Defaults to None.
                 proxy_user (str, optional): Proxy password if needed. Defaults to None.
         """
         self.current_season: str = current_season  # e.g., "2024-25"
         self.SAVE_MODE: str = save_mode
-        self.proxy: str | None = build_proxy_url(proxy_user, proxy_pass)
+        self.proxy: str | None = (
+            build_proxy_url(proxy_user, proxy_pass)
+            if proxy_user and proxy_pass
+            else None
+        )
         print(f"[PROXY] players → {'enabled' if self.proxy else 'disabled (no creds)'}")
-  
+
     def get_nba_players_index(self) -> pd.DataFrame:
         """
         Fetch NBA players data from the NBA stats API and clean it.
@@ -47,31 +55,33 @@ class NbaPlayersData(metaclass=SingletonMeta):
             ).get_data_frames()[0]
         )
 
-        # Select relevant columns 
+        # Select relevant columns
         playerindex_df = playerindex_df[
-            ["PERSON_ID",
-             "PLAYER_LAST_NAME",
-             "PLAYER_FIRST_NAME",
-             "PLAYER_SLUG",
-             "TEAM_ID",
-             "TEAM_ABBREVIATION",
-             "JERSEY_NUMBER",
-             "POSITION",
-             "HEIGHT",
-             "WEIGHT",
-             "COLLEGE",
-             "COUNTRY",
-             "DRAFT_YEAR",
-             "DRAFT_ROUND",
-             "DRAFT_NUMBER",
-             "ROSTER_STATUS",
-             "FROM_YEAR",
-             "TO_YEAR"
-            ]]
-        
-        # Lower case column names 
+            [
+                "PERSON_ID",
+                "PLAYER_LAST_NAME",
+                "PLAYER_FIRST_NAME",
+                "PLAYER_SLUG",
+                "TEAM_ID",
+                "TEAM_ABBREVIATION",
+                "JERSEY_NUMBER",
+                "POSITION",
+                "HEIGHT",
+                "WEIGHT",
+                "COLLEGE",
+                "COUNTRY",
+                "DRAFT_YEAR",
+                "DRAFT_ROUND",
+                "DRAFT_NUMBER",
+                "ROSTER_STATUS",
+                "FROM_YEAR",
+                "TO_YEAR",
+            ]
+        ]
+
+        # Lower case column names
         playerindex_df.columns = [col.lower() for col in playerindex_df.columns]
-                
+
         return playerindex_df
 
     def run(self) -> None:
@@ -80,7 +90,9 @@ class NbaPlayersData(metaclass=SingletonMeta):
             df = self.get_nba_players_index()
             if df is not None and not df.empty:
                 save_database(df, PlayersFileName, mode=self.SAVE_MODE)
-                print(f"✅ Players data saved with mode: {self.SAVE_MODE} (rows={len(df)})")
+                print(
+                    f"✅ Players data saved with mode: {self.SAVE_MODE} (rows={len(df)})"
+                )
             else:
                 print("⚠️ No players data fetched. Process skipped.")
         except Exception as e:

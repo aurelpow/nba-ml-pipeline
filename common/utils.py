@@ -1,6 +1,7 @@
 """
 This module contains common utility functions for NBA data processing.
 """
+
 import time
 import logging
 import pandas as pd
@@ -25,7 +26,9 @@ def build_proxy_url(proxy_user: str, proxy_pass: str) -> str | None:
     """
     if not proxy_user or not proxy_pass:
         return None
-    return f"http://{quote(proxy_user, safe='')}:{quote(proxy_pass, safe='')}@{PROXY_HOST}"
+    return (
+        f"http://{quote(proxy_user, safe='')}:{quote(proxy_pass, safe='')}@{PROXY_HOST}"
+    )
 
 
 def get_retry_session(proxy_url: str | None = None) -> requests.Session:
@@ -38,7 +41,7 @@ def get_retry_session(proxy_url: str | None = None) -> requests.Session:
     session = requests.Session()
     retry = Retry(
         total=3,
-        backoff_factor=2,           # waits 2 s, 4 s, 8 s between retries
+        backoff_factor=2,  # waits 2 s, 4 s, 8 s between retries
         status_forcelist=list(_RETRY_STATUS),
         allowed_methods=["GET"],
         raise_on_status=False,
@@ -51,7 +54,9 @@ def get_retry_session(proxy_url: str | None = None) -> requests.Session:
     return session
 
 
-def call_nba_api_with_retry(fn, *args, max_retries: int = 3, backoff: float = 2.0, **kwargs):
+def call_nba_api_with_retry(
+    fn, *args, max_retries: int = 3, backoff: float = 2.0, **kwargs
+):
     """
     Call any zero-argument callable (or callable fn(*args, **kwargs)) that
     wraps an nba_api endpoint, retrying on transient ProxyError / timeout.
@@ -70,18 +75,34 @@ def call_nba_api_with_retry(fn, *args, max_retries: int = 3, backoff: float = 2.
             last_exc = exc
             err_str = str(exc)
             # Only retry on transient network / proxy errors
-            transient = any(kw in err_str for kw in (
-                "522", "524", "ProxyError", "ReadTimeoutError",
-                "ConnectionError", "RemoteDisconnected", "Read timed out",
-            ))
+            transient = any(
+                kw in err_str
+                for kw in (
+                    "522",
+                    "524",
+                    "ProxyError",
+                    "ReadTimeoutError",
+                    "ConnectionError",
+                    "RemoteDisconnected",
+                    "Read timed out",
+                )
+            )
             if not transient or attempt == max_retries:
                 logger.error("[retry] Non-retryable or max retries reached: %s", exc)
                 raise
-            wait = backoff ** attempt
-            logger.warning("[retry] Attempt %d/%d failed (%s). Retrying in %.0fs...",
-                           attempt, max_retries, exc.__class__.__name__, wait)
+            wait = backoff**attempt
+            logger.warning(
+                "[retry] Attempt %d/%d failed (%s). Retrying in %.0fs...",
+                attempt,
+                max_retries,
+                exc.__class__.__name__,
+                wait,
+            )
             time.sleep(wait)
-    raise last_exc  # unreachable, satisfies type checkers
+    if last_exc is not None:
+        raise last_exc
+    raise RuntimeError("Retry loop exited without returning or raising")
+
 
 # Function to extract season from game_id
 def extract_season(game_id):
@@ -98,26 +119,27 @@ def extract_season(game_id):
         if len(str(game_id)) == 8:
             gid = str(game_id)[1:3]
             return int(gid) + 2000
-        
-        if game_id.startswith('00'):
+
+        if game_id.startswith("00"):
             gid = game_id[3:5]
             return int(gid) + 2000
     except Exception:
         return np.nan
+
 
 # Function to transform minutes from string to float
 def parse_minutes(val):
     """
     Convert 'MM:SS' or 'H:MM:SS' to minutes (float).
     Args:
-        val (str or float): The minutes string or numeric value.    
+        val (str or float): The minutes string or numeric value.
         Returns:
             float: The total minutes as a float.
     """
-    if pd.isna(val) or val == '':
+    if pd.isna(val) or val == "":
         return 0.0
     try:
-        parts = str(val).split(':')
+        parts = str(val).split(":")
         if len(parts) == 2:  # MM:SS
             m, s = map(int, parts)
             return m + s / 60
