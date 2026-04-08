@@ -37,15 +37,17 @@ DEFAULT_PARAMS = {
         'colsample_bytree': 0.8
     },
     'fantasy_points': {
-        'n_estimators': 2600,
-        'learning_rate': 0.007,
-        'max_depth': 9,
-        'num_leaves': 63,
-        'subsample': 0.8,
+        'objective': 'quantile',
+        'alpha': 0.75,
+        'n_estimators': 800,        # fewer trees, quantile loss converges differently
+        'learning_rate': 0.02,      # faster than 0.007 — quantile loss is noisy
+        'max_depth': 7,             # shallower — less variance on non-smooth loss
+        'num_leaves': 50,           # down from 63
+        'subsample': 0.7,
         'colsample_bytree': 0.6,
-        'reg_alpha': 1.0,
-        'reg_lambda': 0.8,
-        'min_child_samples': 50
+        'reg_alpha': 0.5,           # reduce L1 slightly
+        'reg_lambda': 1.0,          # keep some L2
+        'min_child_samples': 40,
     }
 }
 
@@ -109,7 +111,7 @@ class UnifiedModelTrainer:
             data_map: Dictionary with raw dataframes
             
         Returns:
-            Tuple of (transformed_df, feature_cols, encoded_cols)
+            Tuple of (transformed_df, feature_cols, encoded_cols, encoder)
         """
         return transform_data(
             data_map=data_map,
@@ -120,13 +122,14 @@ class UnifiedModelTrainer:
             target_computer_fn=self.target_computer_fn
         )
 
-    def persist(self, model: Any, metrics: Dict[str, Any]) -> None:
+    def persist(self, model: Any, metrics: Dict[str, Any], encoder: Any = None) -> None:
         """
         Save trained model and metadata.
         
         Args:
             model: Trained model object
             metrics: Model performance metrics
+            encoder: Fitted encoder object (optional)
         """
         persist_model(
             model=model,
@@ -154,7 +157,7 @@ class UnifiedModelTrainer:
             data_map = self.read()
             
             # 2. Transform data
-            df, self.feature_cols, encoded_cols = self.transform(data_map)
+            df, self.feature_cols, encoded_cols, self.encoder = self.transform(data_map)
             
             # 3. Split train/test
             X_train, X_test, y_train, y_test, split_info = split_train_test(
@@ -178,7 +181,7 @@ class UnifiedModelTrainer:
             metrics.update(split_info)
             
             # 6. Persist model
-            self.persist(model=model, metrics=metrics)
+            self.persist(model=model, metrics=metrics, encoder=self.encoder)
             
             logger.info("Training pipeline completed successfully!")
             

@@ -3,7 +3,7 @@
 import logging
 import pandas as pd
 import numpy as np
-from typing import Dict, List, Tuple, Any
+from typing import Dict, List, Tuple, Any, Optional
 
 from common.io_utils import BoxscoreFileName, AdvancedBoxscoreFileName, PlayersFileName, MetricsFileName, load_data, save_database
 from common.feature_engineering import (
@@ -48,7 +48,7 @@ def transform_data(
     categorical_cols: List[str],
     rolling_windows: List[int],
     target_computer_fn=None
-) -> Tuple[pd.DataFrame, List[str], List[str]]:
+) -> Tuple[pd.DataFrame, List[str], List[str], Any]:
     """
     Transform raw data into ML-ready features.
     
@@ -61,7 +61,7 @@ def transform_data(
         target_computer_fn: Optional function to compute custom target
         
     Returns:
-        Tuple of (transformed_df, feature_columns, encoded_columns)
+        Tuple of (transformed_df, feature_columns, encoded_columns, encoder)
     """
     logger.info("Transforming data...")
     
@@ -87,7 +87,7 @@ def transform_data(
     
     # 4. Encode Categoricals
     logger.info("Encoding categorical features...")
-    df, encoded_cols = encode_categorical_features(df, categorical_cols)
+    df, encoded_cols, encoder = encode_categorical_features(df, categorical_cols)
     
     # 5. Define Feature Columns
     feature_cols = get_feature_cols(key_stats, rolling_periods=rolling_windows)
@@ -99,7 +99,7 @@ def transform_data(
     feature_cols.extend(encoded_cols)
     logger.info(f"Total features: {len(feature_cols)}")
     
-    return df, feature_cols, encoded_cols
+    return df, feature_cols, encoded_cols, encoder 
 
 
 def split_train_test(
@@ -146,7 +146,7 @@ def train_and_evaluate(
     y_test: pd.Series,
     tune_params: bool = True,
     n_iter: int = 20,
-    default_params: Dict[str, Any] = None
+    default_params: Optional[Dict[str, Any]] = None
 ) -> Tuple[Any, Dict[str, Any]]:
     """
     Train model with optional hyperparameter tuning.
@@ -167,11 +167,27 @@ def train_and_evaluate(
     
     # Hyperparameter tuning or use defaults
     if tune_params:
-        best_params = tune_hyperparameters(X_train, y_train, n_iter=n_iter)
+        # Forward alpha from default_params so the tuner uses the correct
+        # objective (quantile vs regression) and scoring (pinball vs RMSE).
+        alpha = (default_params or {}).get('alpha', None)
+        best_params = tune_hyperparameters(X_train, y_train, n_iter=n_iter, alpha=alpha)
+        # Carry fixed params (objective, alpha) that are not part of the search space.
+        # Using `default_params and key in default_params` lets Pylance narrow the type
+        # to Dict[str, Any] inside the branch, avoiding the Optional subscript error.
+        for key in ('objective', 'alpha'):
+            if default_params and key in default_params:
+                best_params.setdefault(key, default_params[key])
     else:
-        best_params = default_params 
+        best_params = default_params
         logger.info("Using provided hyperparameters (tune_params=False)")
-    
+
+    # Guard: best_params must not be None before training.
+    # This can only happen if tune_params=False and default_params was not provided.
+    if best_params is None:
+        raise ValueError(
+            "No hyperparameters available: set tune_params=True or provide default_params."
+        )
+
     # Train final model
     model = train_model(X_train, y_train, best_params)
     
@@ -190,7 +206,8 @@ def persist_model(
     key_stats: Dict[str, str],
     categorical_cols: List[str],
     model_path: str,
-    save_mode: str = "local"
+    save_mode: str = "local", 
+    encoder: Any = None
 ) -> None:
     """
     Save trained model and metadata.
@@ -204,6 +221,7 @@ def persist_model(
         categorical_cols: List of categorical columns
         model_path: Path to save model
         save_mode: Save mode ('local' or 'bq')
+        encoder: Fitted encoder object (optional)
     """
     logger.info("Persisting model artifact...")
     save_model_artifact(
@@ -214,7 +232,8 @@ def persist_model(
         key_stats=key_stats,
         categorical_cols=categorical_cols,
         filepath=model_path,
-        save_mode=save_mode
+        save_mode=save_mode,
+        encoder=encoder
     )
     logger.info("Model saved successfully!")
     

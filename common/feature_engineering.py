@@ -2,7 +2,9 @@ import pandas as pd
 import numpy as np
 import datetime
 from typing import List, Dict, Tuple, Any
+from numpy.typing import NDArray
 from sklearn.preprocessing import OneHotEncoder
+from scipy.sparse import spmatrix
 from common.utils import parse_minutes
 
 
@@ -141,9 +143,8 @@ def create_historical_features(
     df_avg = (
         df_hist.groupby(
             ["position_group", "opponent", "game_date", "season"], as_index=False
-        )[target_col]
-        .mean()
-        .rename(columns={target_col: "avg_target"})
+        )
+        .agg(avg_target=(target_col, "mean"))
     )
 
     # sort chronologically per group (oldest -> newest)
@@ -200,16 +201,20 @@ def normalize_features(df: pd.DataFrame, key_stats: Dict[str, str]) -> pd.DataFr
     Returns:
         pd.DataFrame: The DataFrame with normalized features added.
     """
-    for stat in key_stats:
-        if stat in df.columns:
-            per36 = f"{stat}_per36"
-            df[per36] = df[stat] / df["minutes"] * 36
 
-    # And per-possession metrics
-    for stat in key_stats:
+    raw_stats = {k for k, v in key_stats.items() if "raw" in v.lower()}
+    eng_stats = {k for k, v in key_stats.items() if "engineering" in v.lower()}
+
+    for stat in raw_stats:
         if stat in df.columns:
-            ppp = f"{stat}_per_poss"
-            df[ppp] = df[stat] / df["possessions"]
+            df[f"{stat}_per36"]    = df[stat] / df["minutes"] * 36
+            df[f"{stat}_per_poss"] = df[stat] / df["possessions"]
+
+    # Engineering stats: expose raw value under both names — no minutes distortion
+    for stat in eng_stats:
+        if stat in df.columns:
+            df[f"{stat}_per36"]    = df[stat]
+            df[f"{stat}_per_poss"] = df[stat]
 
     return df
 
@@ -269,14 +274,17 @@ def compute_rolling_stats(
 
 
 def encode_categorical_features(
-    df: pd.DataFrame, categorical_cols: List[str]
-) -> Tuple[pd.DataFrame, List[str]]:
+    df: pd.DataFrame, 
+    categorical_cols: List[str],
+    encoder: OneHotEncoder | None = None
+) -> Tuple[pd.DataFrame, List[str], OneHotEncoder]:
     """
     Encode categorical features using one-hot encoding.
 
     Args:
         df (pd.DataFrame): input DataFrame
         categorical_cols (List[str]): list of categorical columns to encode
+        encoder (OneHotEncoder, optional): Pre-fitted OneHotEncoder. If None, a new one will be fitted.
 
     Returns:
         Tuple[pd.DataFrame, List[str], OneHotEncoder]:
@@ -284,9 +292,12 @@ def encode_categorical_features(
             - List of new feature names
             - Fitted encoder
     """
-    # encode categorical features
-    encoder: OneHotEncoder = OneHotEncoder(sparse_output=False, handle_unknown="ignore")
-    encoded_categorical: np.ndarray = encoder.fit_transform(df[categorical_cols])
+    if encoder is None:
+        # encode categorical features
+        encoder = OneHotEncoder(sparse_output=False, handle_unknown="ignore")
+        encoded_categorical: NDArray[Any] = encoder.fit_transform(df[categorical_cols])  # type: ignore
+    else:
+        encoded_categorical: NDArray[Any] = encoder.transform(df[categorical_cols])  # type: ignore
 
     feature_names: Any = encoder.get_feature_names_out(categorical_cols).tolist()
 
@@ -299,7 +310,7 @@ def encode_categorical_features(
         axis=1,
     )
 
-    return final_df, feature_names
+    return final_df, feature_names, encoder
 
 
 def get_feature_cols(
@@ -319,21 +330,26 @@ def get_feature_cols(
 
     # Separate raw stats (get rolling) vs engineering stats (get per36/per_poss only)
     raw_stats = [k for k, v in key_stats.items() if "raw" in v.lower()]
+    raw_stats_no_poss = [k for k in raw_stats if k != "possessions"]
     engineering_stats = [k for k, v in key_stats.items() if "engineering" in v.lower()]
 
     # 1) Add rolling features GROUPED BY WINDOW (matching notebook)
     for window in rolling_periods:
         # First add all _per36_rolling_X for this window
-        for stat in raw_stats:
+        for stat in raw_stats_no_poss:
             feature_cols.append(f"{stat}_per36_rolling_{window}")
 
         # Then add all _per_poss_rolling_X for this window
-        for stat in raw_stats:
+        for stat in raw_stats_no_poss:
             feature_cols.append(f"{stat}_per_poss_rolling_{window}")
 
         # Then add all raw rolling stats (e.g. minutes_rolling_5)
         for stat in raw_stats:
             feature_cols.append(f"{stat}_rolling_{window}")
+        # possessions_per36 rolling — only when possessions is in key_stats
+        # (points model does not include it, fantasy model does)
+        if "possessions" in raw_stats:
+            feature_cols.append(f"possessions_per36_rolling_{window}")
 
     # 2) Add historical averages (engineering stats) - per36 first, then per_poss
     for stat in engineering_stats:

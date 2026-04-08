@@ -93,11 +93,14 @@ class TestFeatureEngineering(unittest.TestCase):
 
     def test_encode_categorical_features(self):
         df = pd.DataFrame({"pos": ["A", "B", "A"]})
-        df, encoded_cols = encode_categorical_features(df, ["pos"])
+        # encode_categorical_features now returns (df, feature_names, encoder)
+        df, encoded_cols, encoder = encode_categorical_features(df, ["pos"])
 
         self.assertIn("pos_A", df.columns)
         self.assertIn("pos_B", df.columns)
         self.assertIn("pos_A", encoded_cols)
+        # encoder should be reusable at inference time
+        self.assertIsNotNone(encoder)
 
     def test_get_feature_cols(self):
         cols = get_feature_cols(self.key_stats, rolling_periods=[5])
