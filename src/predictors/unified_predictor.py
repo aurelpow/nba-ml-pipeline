@@ -216,7 +216,7 @@ class UnifiedPredictor(metaclass=SingletonMeta):
         return specific_games_df
 
     def transform_data(
-        self, data_map: dict, model: Any
+        self, data_map: dict, model: Any, encoder: Any = None
     ) -> tuple[pd.DataFrame, pd.DataFrame]:
         """
         Transform data for predictions.
@@ -224,6 +224,7 @@ class UnifiedPredictor(metaclass=SingletonMeta):
         Args:
             data_map: Dictionary containing loaded dataframes
             model: Trained model
+            encoder: Encoder used during training (for consistent encoding)
 
         Returns:
             Tuple of (predictions_df, games_played_df) where games_played_df has
@@ -282,8 +283,8 @@ class UnifiedPredictor(metaclass=SingletonMeta):
         )
 
         # Encode Categoricals
-        encoded_df, encoded_feature_names = encode_categorical_features(
-            df=df_hist, categorical_cols=self.categorical_cols
+        encoded_df, encoded_feature_names, _ = encode_categorical_features(
+            df=df_hist, categorical_cols=self.categorical_cols, encoder=encoder
         )
 
         # Get volatility
@@ -398,18 +399,21 @@ class UnifiedPredictor(metaclass=SingletonMeta):
         try:
             logger.info(f"Starting prediction pipeline for {self.target}...")
 
-            # 1. Load Model
-            logger.info(f"Loading model from: {self.model_path}...")
-            model = load_model_artifact(
+            # 1. Load Model artifact (returns full dict: model, encoder, metadata)
+            logger.info(f"Loading model artifact from: {self.model_path}...")
+            artifact = load_model_artifact(
                 model_path=self.model_path, target=self.target, mode=self.save_mode
             )
+            model   = artifact["model"]
+            encoder = artifact.get("encoder", None)
 
             # 2. Read Data
             data_map = self.read_data()
 
             # 3. Transform Data & Make Predictions
+            # encoder is passed explicitly — no hidden instance state
             predictions_df, games_played_df = self.transform_data(
-                data_map=data_map, model=model
+                data_map=data_map, model=model, encoder=encoder
             )
 
             # 4. Persist Results (includes confidence computation)
