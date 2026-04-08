@@ -6,7 +6,7 @@ set -euo pipefail
 : "${SEASON_TYPE:=Regular Season}"      # default to Regular Season
 : "${SAVE_MODE:=local}"                    # default to local (bq for Cloud)
 : "${MODEL_PATH:=ml_dev/models}"            # default to local directory
-: "${TARGET:=points}"                      # default to points only
+: "${TARGETS:=points}"                      # default to points only
 : "${TUNE_HYPERPARAMETERS:=false}"         # default to no tuning
 
 # Optional proxy creds (exported if present)
@@ -74,7 +74,7 @@ log "✅ Finished compute_availability"
 
 log "➡️ Running train..."
 # Convert space-separated targets to individual arguments
-python main.py -p train -sm "$SAVE_MODE" -m "$MODEL_PATH" -t $TARGET --tune_params "$TUNE_HYPERPARAMETERS"
+python main.py -p train -sm "$SAVE_MODE" -m "$MODEL_PATH" -t $TARGETS --tune_params "$TUNE_HYPERPARAMETERS"
 log "✅ Finished train"
 
 log "➡️ Running get_predictions_stats_points..."
