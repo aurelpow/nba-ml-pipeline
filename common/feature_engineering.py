@@ -4,7 +4,6 @@ import datetime
 from typing import List, Dict, Tuple, Any
 from numpy.typing import NDArray
 from sklearn.preprocessing import OneHotEncoder
-from scipy.sparse import spmatrix
 from common.utils import parse_minutes
 
 
