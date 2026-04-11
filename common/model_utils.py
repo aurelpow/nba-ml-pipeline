@@ -247,9 +247,12 @@ def evaluate_model(model: LGBMRegressor,
     logger.info(f"  Train → R²={train_r2:.4f}, RMSE={train_rmse:.4f}")
     logger.info(f"  Overfit Gap: {metrics['overfitting_gap']:.4f}")
 
-    # Pinball loss — the correct metric for quantile models.
-    # For regression models this is None (MAE/RMSE remain the primary metrics).
-    alpha = getattr(model, 'alpha', None)
+    # Pinball loss — only meaningful for quantile models.
+    # LGBMRegressor always exposes an `alpha` attribute (default 0.9) even for
+    # non-quantile objectives, so we guard on objective first to avoid computing
+    # misleading pinball metrics for standard regression models.
+    params = model.get_params() if hasattr(model, 'get_params') else {}
+    alpha = params.get('alpha') if params.get('objective') == 'quantile' else None
     if alpha is not None:
         def _pinball(y_true: Union[pd.Series, np.ndarray],
                      y_pred: Union[pd.Series, np.ndarray]) -> float:
