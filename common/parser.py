@@ -18,6 +18,13 @@ def build_parser(parser:argparse.ArgumentParser):
     parser.add_argument("-d","--date", type=str, default=None, help="Date to run the process for (optional)")
     parser.add_argument("-m","--model_path", type=str, default=None, help="Path to the model for predictions (optional)")
     parser.add_argument(
+        "-dw",
+        "--discord_webhook_url",
+        type=str,
+        default=None,
+        help="Discord webhook URL for post_evaluation alerts (optional; falls back to DISCORD_WEBHOOK_URL)",
+    )
+    parser.add_argument(
         "-t", "--target",
         nargs="+",
         type=lambda s: "fantasy_points" if s in ("fantasy", "fantasy_points") else s,
@@ -36,7 +43,8 @@ def build_parser(parser:argparse.ArgumentParser):
     season_type = args.season_type
     date = args.date
     model_path = args.model_path
+    discord_webhook_url = args.discord_webhook_url
     target = args.target
     tune_params = args.tune_params.lower() == "true"
     
-    return process_name, current_season, save_mode, season_type, date, model_path, target, tune_params
+    return process_name, current_season, save_mode, season_type, date, model_path, discord_webhook_url, target, tune_params

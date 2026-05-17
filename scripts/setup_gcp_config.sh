@@ -71,6 +71,8 @@ read -p "Enter secret name for Proxy User [nba-proxy-user]: " NBA_PROXY_USER_SEC
 NBA_PROXY_USER_SECRET=${NBA_PROXY_USER_SECRET:-nba-proxy-user}
 read -p "Enter secret name for Proxy Password [nba-proxy-pass]: " NBA_PROXY_PASS_SECRET
 NBA_PROXY_PASS_SECRET=${NBA_PROXY_PASS_SECRET:-nba-proxy-pass}
+read -p "Enter secret name for Discord webhook URL [discord-webhook-url]: " DISCORD_WEBHOOK_URL_SECRET
+DISCORD_WEBHOOK_URL_SECRET=${DISCORD_WEBHOOK_URL_SECRET:-discord-webhook-url}
 
 # Get Git settings
 echo ""
@@ -102,6 +104,7 @@ echo ""
 echo "Secrets:"
 echo "  Proxy User:      ${NBA_PROXY_USER_SECRET}"
 echo "  Proxy Pass:      ${NBA_PROXY_PASS_SECRET}"
+echo "  Discord Hook:    ${DISCORD_WEBHOOK_URL_SECRET}"
 echo ""
 echo "Git Settings:"
 echo "  Project Dir:     ${PROJECT_DIR}"
@@ -156,6 +159,7 @@ export TUNE_PARAMS="${TUNE_PARAMS}"
 # 🔑 Secret Manager Settings
 export NBA_PROXY_USER_SECRET="${NBA_PROXY_USER_SECRET}"
 export NBA_PROXY_PASS_SECRET="${NBA_PROXY_PASS_SECRET}"
+export DISCORD_WEBHOOK_URL_SECRET="${DISCORD_WEBHOOK_URL_SECRET}"
 
 # 📦 Model Paths (in Cloud Storage)
 # Production models (used by production jobs)
@@ -216,6 +220,7 @@ if [ "\$1" = "--show" ]; then
     echo "🔑 Secrets:"
     echo "   • Proxy User: \${NBA_PROXY_USER_SECRET}"
     echo "   • Proxy Pass: \${NBA_PROXY_PASS_SECRET}"
+    echo "   • Discord Hook: ${DISCORD_WEBHOOK_URL_SECRET}"
     echo ""
     echo "🪣 Storage:"
     echo "   • Bucket: \${BUCKET_NAME}"
