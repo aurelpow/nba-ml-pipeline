@@ -48,6 +48,7 @@ export IMAGE_NAME="nba_project"                  # ← Keep this
 # 🔑 Secret Manager Settings
 export NBA_PROXY_USER_SECRET="nba-proxy-user"    # ← Name of your secret in GCP
 export NBA_PROXY_PASS_SECRET="nba-proxy-pass"    # ← Name of your secret in GCP
+export DISCORD_WEBHOOK_URL_SECRET="discord-webhook-url"  # ← Name of your secret in GCP
 
 # 📁 Git & Project Settings
 export PROJECT_DIR="~/nba_project_ML"            # ← Adjust if your path is different
@@ -172,7 +173,17 @@ gcloud run jobs update nba-training-develop \
 - **Targets**: Defined in `gcp_config.sh` (default: `points fantasy_points`)
 - **Model Path**: `gs://bucket/models_trained/develop` (directory)
 - **Execution**: `main.py` loops through targets and trains models sequentially.
-- Secrets injected: `NBA_PROXY_USER`, `NBA_PROXY_PASS`
+- Secrets injected: `NBA_PROXY_USER`, `NBA_PROXY_PASS`, `DISCORD_WEBHOOK_URL`
+
+### Discord Alerts for Evaluation
+
+The post-evaluation step supports either `DISCORD_WEBHOOK_URL` from the environment or the `--discord_webhook_url` CLI flag.
+
+For a local smoke test:
+```bash
+export DISCORD_WEBHOOK_URL="https://discord.com/api/webhooks/..."
+python main.py -p post_evaluation -sm local -d 2026-05-09
+```
 
 ### Production Job
 

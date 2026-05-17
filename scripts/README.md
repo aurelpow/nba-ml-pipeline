@@ -64,6 +64,7 @@ cp scripts/gcp_config.sh.example scripts/gcp_config.sh
 - Artifact Registry details
 - Model storage paths
 - Compute resources
+- Secret Manager secret names for proxy credentials and Discord webhook
 
 **Note:** The actual `gcp_config.sh` is in `.gitignore` (contains sensitive info)
 
@@ -143,6 +144,7 @@ cp scripts/gcp_config.sh.example scripts/gcp_config.sh
 3. Uses `:develop` image
 4. Executes job immediately
 5. Saves model to `develop/` folder
+6. Mounts `DISCORD_WEBHOOK_URL` so post-evaluation alerts can fire when present
 
 **Job names created:**
 - `nba-training-fantasy_points-develop`
@@ -169,7 +171,7 @@ cp scripts/gcp_config.sh.example scripts/gcp_config.sh
 2. Waits for completion
 3. Shows execution details
 4. Displays recent logs
-
+5. Mounts `DISCORD_WEBHOOK_URL` so post-evaluation alerts can fire when present
 **When to use:**
 - After creating a job
 - Re-running training with same config
@@ -215,10 +217,11 @@ cp scripts/gcp_config.sh.example scripts/gcp_config.sh
 ./scripts/delete_cloud_job_develop.sh <target>
 ```
 
-**Examples:**
+ **When to use:**
 ```bash
 ./scripts/delete_cloud_job_develop.sh fantasy_points
 ./scripts/delete_cloud_job_develop.sh points
+6. Mounts `DISCORD_WEBHOOK_URL` so post-evaluation alerts can fire when present
 ```
 
 **What it does:**
@@ -258,6 +261,7 @@ cp scripts/gcp_config.sh.example scripts/gcp_config.sh
 3. Uses `:latest` image
 4. Configures for production
 5. Saves model to `prod/` folder
+6. Mounts `DISCORD_WEBHOOK_URL` so post-evaluation alerts can fire when present
 
 **Job names created:**
 - `nba-training-fantasy_points-prod`

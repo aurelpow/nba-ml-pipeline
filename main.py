@@ -24,6 +24,7 @@ from src.data_collectors.get_nba_teams import NbaTeamsData
 from src.data_collectors.get_nba_schedule import ScheduleData
 from src.data_collectors.get_nba_advanced_boxscore import AdvancedBoxscoreGames
 from src.data_collectors.get_injury_report import InjuryReportCollector
+from src.data_collectors.check_games_scheduled import GamesScheduleChecker
 from src.availability.availability_table import AvailabilityTableBuilder
 from src.predictors.unified_predictor import UnifiedPredictor
 from src.training.train import UnifiedModelTrainer
@@ -44,6 +45,7 @@ def main():
         season_type,
         date,
         model_path,
+        discord_webhook_url,
         target,
         tune_params,
     ) = build_parser(parser)
@@ -54,11 +56,13 @@ def main():
         "get_nba_schedule",
         "get_nba_boxscore_basic",
         "get_nba_advanced_boxscore",
+        "check_games_scheduled",
         "get_injury_report",
         "compute_availability",
         "train",
         "get_predictions_stats_points",
         "get_predictions_fantasy_points",
+        "post_evaluation",
     ]
 
     # Strip whitespace and check for validity
@@ -113,6 +117,16 @@ def main():
             proxy_pass=os.getenv("NBA_PROXY_PASS"),
         ).run()
 
+    elif process_name == "check_games_scheduled":
+        if not date:
+            logging.error("check_games_scheduled requires -d <YYYY-MM-DD>")
+            sys.exit(1)
+        n_games = GamesScheduleChecker(date=date, save_mode=save_mode).run()
+        if n_games == 0:
+            print(f"⏭️ No games scheduled for {date} — skipping date-specific steps.")
+            sys.exit(2)
+        print(f"✅ {n_games} game(s) found for {date} — pipeline continues.")
+
     elif process_name == "get_injury_report":
         print(f"Running process: {process_name} with date: {date}")
         InjuryReportCollector(
@@ -153,6 +167,15 @@ def main():
             save_mode=save_mode,
             date=date,
             model_path=model_path,
+        ).run()
+
+    elif process_name == "post_evaluation":
+        from src.evaluators.post_evaluation import PostGameEvaluator
+        print(f"Running process: {process_name} with date: {date}")
+        PostGameEvaluator(
+            date=date,
+            save_mode=save_mode,
+            webhook_url=discord_webhook_url,
         ).run()
 
     # print the time taken to run the process

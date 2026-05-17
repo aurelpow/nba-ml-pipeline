@@ -6,11 +6,12 @@ import os
 import re
 import pandas as pd
 from google.cloud import bigquery
-from google.cloud import storage
-import joblib
-import tempfile
-from typing import Optional, Iterable
+from typing import Iterable
 from google.api_core.exceptions import NotFound, BadRequest
+from common.raw_columns import (
+    game_id_col,
+    game_id_col_alt
+)
 
 # Define the names of the files to be used in the databases folder.
 AdvancedBoxscoreFileName: str = "nba_boxscore_advanced"
@@ -24,6 +25,11 @@ MetricsFileName: str = "model_training_metrics_df"
 # Availability subsystem
 InjuryReportFileName: str = "nba_injury_report"  # raw parsed PDF rows
 AvailabilityFileName: str = "nba_player_availability"  # enriched downstream table
+# Actual scores (partitioned by game_date)
+ActualScoresFileName: str = "nba_actual_scores"
+# Post-game evaluation output tables
+EvaluationFileName: str = "nba_model_evaluation"
+EvaluationDetailFileName: str = "nba_model_evaluation_detail"
 
 # Define the path to the databases folder.
 databases_path: str = "databases/"
@@ -33,6 +39,24 @@ DATASET_ID = "nba_dataset"
 
 def _table_ref(table_name: str) -> str:
     return f"{PROJECT_ID}.{DATASET_ID}.{table_name}"
+
+
+def delete_rows_by_evaluation_date(table_name: str, evaluation_date: str) -> int:
+    """Delete rows where evaluation_date matches, used for idempotent evaluation writes."""
+    client = bigquery.Client()
+    table_id = _table_ref(table_name)
+    try:
+        client.get_table(table_id)
+    except NotFound:
+        print(f"Table {table_id} not found, skipping deletion")
+        return 0
+    job = client.query(
+        f"DELETE FROM `{table_id}` WHERE evaluation_date = '{evaluation_date}'"
+    )
+    job.result()
+    deleted = getattr(job, "num_dml_affected_rows", 0) or 0
+    print(f"🧹 Deleted {deleted} rows from {table_id} for {evaluation_date}")
+    return deleted
 
 
 def _delete_rows_by_game_id(
@@ -137,11 +161,22 @@ def save_database(
     mode: str = "bq",
     write_disposition: str = "WRITE_TRUNCATE",
     autodetect_schema: bool = True,
+    skip_dedup: bool = False,
 ) -> None:
     """
     Save a DataFrame either locally or to BigQuery.
-    - If df has gameId column: delete matching rows before append
+    - If df has gameId column and write_disposition=WRITE_APPEND and skip_dedup=False:
+      delete matching rows before append (game-level idempotency for boxscore/predictions).
+    - skip_dedup=True bypasses the game-id deletion; use when the caller handles its own
+      idempotency (e.g. delete_rows_by_evaluation_date before writing evaluation tables).
     - Else: overwrite table (default WRITE_TRUNCATE)
+    Args:
+        - df (pd.DataFrame): DataFrame to save
+        - table_name (str): Name of the table (without project/dataset prefix)
+        - mode (str): 'local' or 'bq'
+        - write_disposition (str): BigQuery write disposition ('WRITE_TRUNCATE' or 'WRITE_APPEND')
+        - autodetect_schema (bool): Whether to autodetect schema for BigQuery
+        - skip_dedup (bool): Whether to skip deduplication by gameId
     """
     if df is None or df.empty:
         print("⚠️ DataFrame empty; nothing to save.")
@@ -162,10 +197,11 @@ def save_database(
     client = bigquery.Client()
     table_id = _table_ref(table_name)
 
-    has_game_id = "gameId" in df.columns
+    has_game_id = game_id_col in df.columns or game_id_col_alt in df.columns
 
-    if has_game_id and write_disposition == "WRITE_APPEND":
-        unique_ids = df["gameId"].astype(str).dropna().unique().tolist()
+    if has_game_id and write_disposition == "WRITE_APPEND" and not skip_dedup:
+        id_col = game_id_col if game_id_col in df.columns else game_id_col_alt
+        unique_ids = df[id_col].astype(str).dropna().unique().tolist()
         deleted = _delete_rows_by_game_id(client, table_id, unique_ids)
         print(
             f"🧹 Deleted {deleted} rows in {table_id} for {len(unique_ids)} gameId(s)."

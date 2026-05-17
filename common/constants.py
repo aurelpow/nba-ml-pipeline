@@ -129,6 +129,22 @@ PREDICTION_EXCLUDE_THRESHOLD: float = 0.10
 CONFIDENCE_MAX_VOLATILITY: float = 25.0  # std dev cap; beyond this → stability = 0
 CONFIDENCE_SAMPLE_SIZE_CAP: int = 20  # games to reach full sample confidence
 
+# ---------------------------------------------------------------------------
+# Post-game evaluation constants
+# ---------------------------------------------------------------------------
+
+# Confidence tier boundaries (lower bound inclusive)
+CONFIDENCE_TIER_GREEN: float = 0.60
+CONFIDENCE_TIER_BLUE: float = 0.30
+# Orange = anything below CONFIDENCE_TIER_BLUE
+
+# MAE thresholds that trigger a Discord alert per tier
+EVAL_MAE_THRESHOLDS: dict[str, float] = {
+    "Green": 8.0,
+    "Blue": 12.0,
+    "Orange": 18.0,
+}
+
 # Target configuration - centralized settings for each target variable
 # To add a new target, simply add a new entry to this dictionary
 TARGET_CONFIGS: dict[str, dict] = {
