@@ -53,6 +53,7 @@ echo "📦 Managing Cloud Run Job: ${JOB_NAME}..."
 # Ensure secrets are defined (default to standard names if missing in config)
 NBA_PROXY_USER_SECRET="${NBA_PROXY_USER_SECRET:-nba-proxy-user}"
 NBA_PROXY_PASS_SECRET="${NBA_PROXY_PASS_SECRET:-nba-proxy-pass}"
+DISCORD_WEBHOOK_URL_SECRET="${DISCORD_WEBHOOK_URL_SECRET:-discord-webhook-url}"
 
 # Check if the job already exists and update it if so
 if gcloud run jobs describe "${JOB_NAME}" --region="${REGION}" --project="${PROJECT_ID}" &>/dev/null; then
@@ -66,7 +67,7 @@ if gcloud run jobs describe "${JOB_NAME}" --region="${REGION}" --project="${PROJ
       --task-timeout=${TIMEOUT} \
       --max-retries=${MAX_RETRIES} \
       --set-env-vars="TARGETS=${TARGETS},TUNE_PARAMS=${TUNE_PARAMS},MODEL_PATH=${MODEL_PATH},SEASON=${SEASON},SEASON_TYPE=${SEASON_TYPE},SAVE_MODE=${SAVE_MODE}" \
-      --set-secrets="NBA_PROXY_USER=${NBA_PROXY_USER_SECRET}:latest,NBA_PROXY_PASS=${NBA_PROXY_PASS_SECRET}:latest" \
+      --set-secrets="NBA_PROXY_USER=${NBA_PROXY_USER_SECRET}:latest,NBA_PROXY_PASS=${NBA_PROXY_PASS_SECRET}:latest,DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL_SECRET}:latest" \
       --quiet
 else
     echo "✨ Job not found. Creating new job..."
@@ -79,7 +80,7 @@ else
       --task-timeout=${TIMEOUT} \
       --max-retries=${MAX_RETRIES} \
       --set-env-vars="TARGETS=${TARGETS},TUNE_PARAMS=${TUNE_PARAMS},MODEL_PATH=${MODEL_PATH},SEASON=${SEASON},SEASON_TYPE=${SEASON_TYPE},SAVE_MODE=${SAVE_MODE}" \
-      --set-secrets="NBA_PROXY_USER=${NBA_PROXY_USER_SECRET}:latest,NBA_PROXY_PASS=${NBA_PROXY_PASS_SECRET}:latest" \
+      --set-secrets="NBA_PROXY_USER=${NBA_PROXY_USER_SECRET}:latest,NBA_PROXY_PASS=${NBA_PROXY_PASS_SECRET}:latest,DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL_SECRET}:latest" \
       --quiet
 fi
 

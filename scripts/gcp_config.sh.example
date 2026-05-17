@@ -33,6 +33,8 @@ export SERVICE_ACCOUNT="your-service-account@your-project-id.iam.gserviceaccount
 # Secret names in Google Secret Manager (not the actual values!)
 export NBA_PROXY_USER_SECRET="NBA_PROXY_USER"    # KEEP THIS: name of secret in Secret Manager
 export NBA_PROXY_PASS_SECRET="NBA_PROXY_PASS"    # KEEP THIS: name of secret in Secret Manager
+# Discord webhook secret name in Secret Manager
+export DISCORD_WEBHOOK_URL_SECRET="DISCORD_WEBHOOK_URL"  # KEEP THIS: name of secret in Secret Manager
 
 # 🐳 Artifact Registry Settings
 # Your Docker repository in Artifact Registry
@@ -71,6 +73,7 @@ export TUNE_PARAMS="false"               # Enable hyperparameter tuning (true/fa
 # Names of your secrets in Google Secret Manager
 export NBA_PROXY_USER_SECRET="nba-proxy-user"
 export NBA_PROXY_PASS_SECRET="nba-proxy-pass"
+export DISCORD_WEBHOOK_URL_SECRET="discord-webhook-url"
 
 # 📁 Git & Project Settings
 export PROJECT_DIR="$HOME/nba_project_ML"        # REPLACE: Use $HOME or absolute path
