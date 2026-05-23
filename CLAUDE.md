@@ -71,13 +71,17 @@ from common.raw_columns import game_id_col, person_id_col_alt, game_date_col
 
 **Critical gotcha — camelCase vs snake_case for IDs and dates:**
 
-| Concept | Boxscore / schedule / actuals | Predictions table |
-|--------|---|---|
-| Game ID | `game_id` (`game_id_col_alt`) | `gameId` (`game_id_col`) |
-| Person ID | `person_id` (`person_id_col`) | `personId` (`person_id_col_alt`) |
-| Game date | `game_date` (`game_date_col`) | `gameDate` (`game_date_col_alt`) |
+Naming is *not* uniformly "snake_case off-table, camelCase on-predictions". It varies by table — always import the right constant from [common/raw_columns.py](common/raw_columns.py) rather than assuming.
 
-When merging predictions with actuals, you'll usually merge on `person_id_col_alt` (camelCase) and convert the date format explicitly. See [post_evaluation.py:108-128](src/evaluators/post_evaluation.py#L108-L128) for the canonical pattern.
+| Concept | Schedule (`nba_schedule_df`) | Boxscore / Actuals | Predictions | Players / Availability |
+|---|---|---|---|---|
+| Game ID | `gameId` (`game_id_col`) | `gameId` (`game_id_col`) | `gameId` (`game_id_col`) | n/a |
+| Person ID | n/a | `personId` (`person_id_col_alt`) | `personId` (`person_id_col_alt`) | `person_id` (`person_id_col`) |
+| Game date | `gameDate` (`game_date_col_alt`) | `game_date` (`game_date_col`) | `gameDate` (`game_date_col_alt`) | n/a |
+
+`game_id_col_alt = "game_id"` exists as a constant but only appears as a transient column in the boxscore collectors (a rename during schedule→boxscore merge that's dropped before persistence); the saved tables all use `gameId`.
+
+When merging predictions with actuals, you merge on `person_id_col_alt` (`personId`, camelCase — same on both sides) and convert the date format explicitly. See [post_evaluation.py:108-128](src/evaluators/post_evaluation.py#L108-L128) for the canonical pattern.
 
 ### 4.2 Predictions output is *narrow* format
 Predictions are written as one row per `(gameId, personId, Measure)`. The `Measure` column encodes what the `Predictions` value means — defined in [common/constants.py](common/constants.py):
