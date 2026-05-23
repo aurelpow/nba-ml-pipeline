@@ -1,5 +1,19 @@
 import pandas as pd
-from common.raw_columns import *
+from common.raw_columns import (
+     assists_col,
+     blocks_col,
+     fantasy_points_col,
+     field_goals_attempted_col,
+     field_goals_made_col,
+     free_throws_attempted_col,
+     free_throws_made_col,
+     points_col,
+     rebounds_total_col,
+     steals_col,
+     three_pointers_attempted_col,
+     three_pointers_made_col,
+     turnovers_col,
+ )
 
 def compute_fantasy_points(df: pd.DataFrame) -> pd.DataFrame:
     """

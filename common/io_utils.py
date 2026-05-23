@@ -51,7 +51,14 @@ def delete_rows_by_evaluation_date(table_name: str, evaluation_date: str) -> int
         print(f"Table {table_id} not found, skipping deletion")
         return 0
     job = client.query(
-        f"DELETE FROM `{table_id}` WHERE evaluation_date = '{evaluation_date}'"
+        f"DELETE FROM `{table_id}` WHERE evaluation_date = @evaluation_date",
+        job_config=bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter(
+                    "evaluation_date", "STRING", evaluation_date
+                )
+            ]
+        ),
     )
     job.result()
     deleted = getattr(job, "num_dml_affected_rows", 0) or 0
@@ -60,11 +67,22 @@ def delete_rows_by_evaluation_date(table_name: str, evaluation_date: str) -> int
 
 
 def _delete_rows_by_game_id(
-    client: bigquery.Client, table_id: str, game_ids: Iterable
+    client: bigquery.Client,
+    table_id: str,
+    game_ids: Iterable,
+    id_column: str = game_id_col,
 ) -> int:
     game_ids = list({str(gid) for gid in game_ids if pd.notna(gid)})
     if not game_ids:
         return 0
+
+    # Guard against SQL injection via column-name interpolation: only allow
+    # the two canonical id column names declared in common/raw_columns.py.
+    if id_column not in (game_id_col, game_id_col_alt):
+        raise ValueError(
+            f"Unsupported id_column for delete: {id_column!r}. "
+            f"Expected one of {(game_id_col, game_id_col_alt)}."
+        )
 
     # ✅ Check if table exists
     try:
@@ -76,7 +94,7 @@ def _delete_rows_by_game_id(
 
     query = f"""
     DELETE FROM `{table_id}`
-    WHERE gameId IN UNNEST(@game_ids)
+    WHERE `{id_column}` IN UNNEST(@game_ids)
     """
     job = client.query(
         query,
@@ -202,9 +220,11 @@ def save_database(
     if has_game_id and write_disposition == "WRITE_APPEND" and not skip_dedup:
         id_col = game_id_col if game_id_col in df.columns else game_id_col_alt
         unique_ids = df[id_col].astype(str).dropna().unique().tolist()
-        deleted = _delete_rows_by_game_id(client, table_id, unique_ids)
+        deleted = _delete_rows_by_game_id(
+            client, table_id, unique_ids, id_column=id_col
+        )
         print(
-            f"🧹 Deleted {deleted} rows in {table_id} for {len(unique_ids)} gameId(s)."
+            f"🧹 Deleted {deleted} rows in {table_id} for {len(unique_ids)} {id_col}(s)."
         )
 
         load_config = bigquery.LoadJobConfig(

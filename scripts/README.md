@@ -217,11 +217,10 @@ cp scripts/gcp_config.sh.example scripts/gcp_config.sh
 ./scripts/delete_cloud_job_develop.sh <target>
 ```
 
- **When to use:**
+**Examples:**
 ```bash
 ./scripts/delete_cloud_job_develop.sh fantasy_points
 ./scripts/delete_cloud_job_develop.sh points
-6. Mounts `DISCORD_WEBHOOK_URL` so post-evaluation alerts can fire when present
 ```
 
 **What it does:**

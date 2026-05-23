@@ -1,6 +1,7 @@
 """
-This module defines the raw columns for the boxscore and predictions dataframes, as well as any necessary mappings or transformations to ensure consistency between the two datasets. It also includes functions for loading and preprocessing the data, such as filtering for the relevant date and measure, and handling any missing or inconsistent values.
-"""
+ Centralized column-name constants used across raw NBA API tables and pipeline outputs.
+ These constants help avoid hardcoding column strings (e.g., camelCase vs snake_case) throughout the codebase.
+ """
 
 # ID columns
 game_id_col: str = "gameId"
@@ -15,8 +16,8 @@ visitor_team_id_col: str = "visitor_team_id"
 opponent_id_col_alt: str = "opponentId"
 
 # Date and time columns
-game_date_col: str = "game_date"        # snake_case — boxscore, schedule, actuals
-game_date_col_alt: str = "gameDate"    # camelCase  — predictions table
+game_date_col: str = "game_date"          # snake_case — boxscore tables
+game_date_col_alt: str = "gameDate"       # camelCase  — schedule + predictions
 report_date_col: str = "report_date"
 
 # Names and identifiers
@@ -79,7 +80,7 @@ aud_modification_date_col: str = "aud_modification_date"
 # Predictions columns
 predictions_col: str = "Predictions"
 measure_col: str = "Measure"
-confidence_col: str = "Confidence"
+confidence_col: str = "confidence"
 
 # Computed target columns
 fantasy_points_col: str = "fantasy_points"

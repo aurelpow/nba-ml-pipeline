@@ -312,9 +312,12 @@ class PostGameEvaluator(metaclass=SingletonMeta):
                 logger.warning("No metrics computed — evaluation skipped.")
                 return
 
-            # 5. Save results and send alerts (idempotent: delete before append)
-            for table in [EvaluationFileName, EvaluationDetailFileName]:
-                delete_rows_by_evaluation_date(table, self.date)
+            # 5. Save results and send alerts (idempotent: delete before append).
+            #    Local mode overwrites the CSV in save_database, so the
+            #    BigQuery delete-by-evaluation_date only applies in bq mode.
+            if self.save_mode == "bq":
+                for table in [EvaluationFileName, EvaluationDetailFileName]:
+                    delete_rows_by_evaluation_date(table, self.date)
             save_database(  df = aggregated_df,
                             table_name = EvaluationFileName,
                             mode=self.save_mode,
