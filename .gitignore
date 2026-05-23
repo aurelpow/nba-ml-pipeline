@@ -198,7 +198,10 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 
-# Project Structure 
+# Project Structure
 #  - This is a project structure file that is used to define the structure of the project
 #  - It is not meant to be committed to the repository
 project-structure.txt
+
+# Claude Code guidance — kept local only, not shared via the repo
+CLAUDE.md
