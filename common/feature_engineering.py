@@ -23,7 +23,7 @@ def merge_data(
     """
     # Merge boxscore df + players
     df_merged = box.merge(
-        players[["person_id", "position"]].rename(
+        players[["person_id", "position"]].rename(  # type: ignore
             columns={"position": "position_player"}
         ),
         left_on="personId",
@@ -59,7 +59,7 @@ def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
         pd.DataFrame: Preprocessed DataFrame.
     """
     # Transform minutes from string to float
-    if "minutes" in df.columns and df["minutes"].dtype == "object":
+    if "minutes" in df.columns and pd.api.types.is_string_dtype(df["minutes"]):
         df["minutes"] = df["minutes"].apply(parse_minutes)
 
     # fill NaN values in 'position' with 'BENCH'
@@ -81,11 +81,11 @@ def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
         )
 
         # Filter out players where position_group is still 'BENCH' (likely missing player info or deep bench)
-        df = df[df["position_group"] != "BENCH"]
+        df = df[df["position_group"] != "BENCH"]  # type: ignore
 
     # Remove rows with no minutes (DNP)
     if "minutes" in df.columns:
-        df = df[df["minutes"].notna()]
+        df = df[df["minutes"].notna()]  # type: ignore
 
     # Change column date type to datetime
     if "game_date" in df.columns:
@@ -149,7 +149,7 @@ def create_historical_features(
     # sort chronologically per group (oldest -> newest)
     df_avg = df_avg.sort_values(
         ["position_group", "opponent", "game_date"], ascending=[True, True, True]
-    ).reset_index(drop=True)
+    ).reset_index(drop=True)  # type: ignore
 
     # Compute rolling averages shifted by 1 to avoid data leakage
 
@@ -377,7 +377,7 @@ def get_rest_days(
     # Get unique players
     players_unique: pd.DataFrame = players_df[
         ["person_id", "team_id"]
-    ].drop_duplicates()
+    ].drop_duplicates()  # type: ignore
 
     # Get last game date for each player
     last_games: pd.DataFrame = (
@@ -396,12 +396,12 @@ def get_rest_days(
     # Calculate rest days
     rest_days_df["rest_days"] = (
         pd.to_datetime(date) - pd.to_datetime(rest_days_df["last_game_date"])
-    ).dt.days
+    ).dt.days  # type: ignore
     rest_days_df["rest_days"] = rest_days_df["rest_days"].fillna(
         7
     )  # Default to 7 days if no last game
 
-    return rest_days_df[["personId", "rest_days"]]
+    return rest_days_df[["personId", "rest_days"]]  # type: ignore
 
 
 def get_volatility(df_historical: pd.DataFrame, target_variable: str) -> pd.DataFrame:
@@ -426,7 +426,7 @@ def get_volatility(df_historical: pd.DataFrame, target_variable: str) -> pd.Data
         df_hist_sorted.sort_values("game_date")
         .groupby("personId")
         .tail(1)[["personId", "fantasy_volatility"]]
-    )
+    )  # type: ignore
 
     return volatility_df
 
@@ -492,7 +492,7 @@ def get_final_df(
         # This shouldn't happen if we merged correctly above, but as a fallback
         future_games_long["rest_days"] = 3  # default value
 
-    X_pred: pd.DataFrame = future_games_long[final_features].fillna(0)
+    X_pred: pd.DataFrame = future_games_long[final_features].fillna(0)  # type: ignore
     # DEBUG: Compare with model's expected features
     if hasattr(model, "feature_name_"):
         model_features = model.feature_name_

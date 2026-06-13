@@ -205,3 +205,6 @@ project-structure.txt
 
 # Claude Code guidance — kept local only, not shared via the repo
 CLAUDE.md
+
+# macOS Finder metadata
+.DS_Store
