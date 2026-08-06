@@ -1,6 +1,6 @@
 [project]
 name = "nba-ml-pipeline"
-version = "0.6.1"
+version = "0.6.2"
 description = "End-to-end ML pipeline that ingests NBA data, trains LightGBM models, predicts player stats (points + TTFL fantasy points), and monitors prediction quality."
 authors = [
     { name = "Aurelien Pow" },
