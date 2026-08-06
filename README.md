@@ -422,6 +422,7 @@ gcloud scheduler jobs create http nba-weekly-training \
 ## 📄 License & Credits
 
 - **Author**: Aurelien Pow ([@aurelpow](https://github.com/aurelpow))
+- **License**: All Rights Reserved — see [LICENSE](LICENSE). This code is shared publicly for portfolio/demonstration purposes; no permission is granted to copy, modify, or redistribute it without written consent.
 
 ## 🛣️ Next Improvements and Features
 - **➕ More stats** (AST / TOV / REB)
