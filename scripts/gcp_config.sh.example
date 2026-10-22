@@ -62,7 +62,7 @@ export MAX_RETRIES="1"                           # Number of retries on failure
 
 # 🔢 NBA Data Settings
 # ✅ Adjust based on your training needs
-export SEASON="2025-26"                          # NBA season to train on
+export SEASON="2026-27"                          # NBA season to train on
 export SEASON_TYPE="Regular Season"              # "Regular Season" or "Playoffs"
 
 # 🎯 Training Settings
