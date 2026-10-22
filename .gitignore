@@ -208,3 +208,7 @@ CLAUDE.md
 
 # macOS Finder metadata
 .DS_Store
+
+# GCP service account keys (never commit credentials)
+ml-nba-project-*.json
+*-ci-key.json
