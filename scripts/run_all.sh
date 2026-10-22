@@ -56,7 +56,14 @@ fi
 python main.py "${POST_EVALUATION_ARGS[@]}"
 log "✅ Finished post_evaluation"
 
-# ── 2. Games gate ─────────────────────────────────────────────────────────────
+# ── 2. Schedule refresh + games gate ──────────────────────────────────────────
+# The schedule must be refreshed BEFORE the gate: otherwise a stale schedule
+# (e.g. last season's at a season rollover) reports "no games" forever and the
+# pipeline never reaches get_nba_schedule to fix it.
+log "➡️ Running get_nba_schedule..."
+python main.py -p get_nba_schedule -s "$SEASON" -sm "$SAVE_MODE"
+log "✅ Finished get_nba_schedule"
+
 # Exit code 2 = no games for DATE → nothing to collect, train, or predict.
 log "➡️ Checking if games are scheduled for $DATE..."
 set +e
@@ -93,10 +100,6 @@ log "✅ Finished get_nba_players"
 log "➡️ Running get_nba_teams..."
 python main.py -p get_nba_teams -sm "$SAVE_MODE"
 log "✅ Finished get_nba_teams"
-
-log "➡️ Running get_nba_schedule..."
-python main.py -p get_nba_schedule -s "$SEASON" -sm "$SAVE_MODE"
-log "✅ Finished get_nba_schedule"
 
 log "➡️ Running get_nba_boxscore_basic..."
 python main.py -p get_nba_boxscore_basic -s "$SEASON" -st "$SEASON_TYPE" -sm "$SAVE_MODE"

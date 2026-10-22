@@ -40,7 +40,16 @@ Open http://localhost:8080. On first start, unlock it with:
 docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword
 ```
 
-Then choose **Install suggested plugins** (this includes AnsiColor, which the Jenkinsfile needs) and create an admin user.
+Then choose **Install suggested plugins** and create an admin user.
+
+The Jenkinsfile uses `ansiColor`, which is **not** part of the suggested plugins. Without it every build fails in about a second with `Invalid option type "ansiColor"`. Install it before the first build:
+
+```bash
+docker exec jenkins jenkins-plugin-cli --plugins ansicolor --plugin-download-directory /var/jenkins_home/plugins
+docker restart jenkins
+```
+
+(or Manage Jenkins -> Plugins -> Available plugins -> **AnsiColor**, then restart).
 
 The `jenkins_jenkins_home` Docker volume holds jobs and credentials, so they survive container restarts. Do not run `docker compose down -v` unless you want to start over.
 
