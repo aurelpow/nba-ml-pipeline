@@ -53,12 +53,12 @@ Google Cloud Platform
 - Runs `flake8` linting for Python syntax errors
 - Non-blocking (continues even if warnings found)
 
-#### 3. **Deploy & Create Job** (only on `dev`/`master`)
+#### 3. **Deploy & Create Job** (only on `dev`/`master`/`feature/*`)
 - Builds Docker image using **Google Cloud Build**
 - Pushes to Artifact Registry
 - Creates/updates Cloud Run Job with latest configuration
 
-#### 4. **Smoke Test** (only on `dev`/`master`)
+#### 4. **Smoke Test** (only on `dev`/`master`/`feature/*`)
 - Triggers Cloud Run Job to verify deployment
 - Ensures ML pipeline can execute end-to-end
 
@@ -68,7 +68,7 @@ Google Cloud Platform
 |--------|-------------|-----------|---------------|
 | `dev` | Develop | `develop` | `nba-training-develop` |
 | `master` | Production | `latest` | `nba-training-prod` |
-| `feature/*` | ❌ No deploy | - | Quality checks only |
+| `feature/*` | Develop (same as `dev`) | `develop` | `nba-training-develop` |
 
 ---
 
@@ -152,9 +152,9 @@ Go to **Manage Jenkins → Credentials → System → Global credentials**
 8. **Behaviors** → **Add** → **"Filter by name (with regular expression)"**
    - **Regular expression:**
      ```
-     (dev|master)
+     (dev|master|feature/.*)
      ```
-   - This ensures only `dev` and `master` branches trigger builds
+   - This ensures only `dev`, `master` and `feature/*` branches trigger builds (`feature/*` deploys to the develop environment)
 
 **Build Configuration:**
 
@@ -350,7 +350,7 @@ gcloud compute instances create jenkins-server \
 1. Click **"Scan Repository Now"**
 2. Check **"Scan Repository Log"** for errors
 3. Verify GitHub credentials are correct
-4. Ensure regex filter `(dev|master)` matches your branch names
+4. Ensure regex filter `(dev|master|feature/.*)` matches your branch names
 
 ### Branch Shows But Not Building
 **Symptom:** Branch appears but no builds triggered

@@ -181,7 +181,7 @@ export TIMEOUT="3600s"
 export MAX_RETRIES="1"
 
 # 🔢 NBA Data Settings
-export SEASON="2025-26"
+export SEASON="2026-27"
 export SEASON_TYPE="Regular Season"
 
 # 📁 Git & Project Settings
