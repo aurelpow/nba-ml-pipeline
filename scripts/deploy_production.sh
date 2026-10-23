@@ -55,13 +55,24 @@ echo "🚀 Step 4: Building and pushing image..."
 echo "   ⏳ This may take several minutes..."
 echo ""
 
-# --suppress-logs: streaming logs needs project Viewer; without it gcloud
-# errors out immediately instead of waiting for the build to finish.
-gcloud builds submit \
+# Submit async and poll the status: waiting synchronously streams logs, which
+# needs project Viewer — without it gcloud errors out while the build runs.
+BUILD_ID=$(gcloud builds submit \
   --tag "${PROD_IMAGE_URI}" \
   --project "${PROJECT_ID}" \
   --timeout=20m \
-  --suppress-logs
+  --async \
+  --format="value(id)")
+echo "   🆔 Cloud Build: ${BUILD_ID}"
+
+while true; do
+  BUILD_STATUS=$(gcloud builds describe "${BUILD_ID}" --project "${PROJECT_ID}" --format="value(status)")
+  case "${BUILD_STATUS}" in
+    SUCCESS) echo "   ✅ Cloud Build finished: ${BUILD_STATUS}"; break ;;
+    QUEUED|PENDING|WORKING) sleep 10 ;;
+    *) echo "   ❌ Cloud Build ${BUILD_ID} finished with status ${BUILD_STATUS}"; exit 1 ;;
+  esac
+done
 
 echo ""
 echo "=================================================="
