@@ -38,7 +38,7 @@ pipeline {
                     file(credentialsId: "${GCP_CREDS_ID}", variable: 'GCP_KEY'),
                     file(credentialsId: "${GCP_CONFIG_ID}", variable: 'SECURE_CONFIG')
                 ]) {
-                    sh '''#!/bin/bash
+                    sh '''#!/bin/bash -e
                         # Inject the secret config into the expected script location
                         mkdir -p scripts
                         cp "$SECURE_CONFIG" scripts/gcp_config.sh
@@ -55,7 +55,7 @@ pipeline {
 
         stage('Setup Python') {
             steps {
-                sh """#!/bin/bash
+                sh """#!/bin/bash -e
                     python3 -m venv ${VENV_DIR}
                     ${PIP} install --upgrade pip --quiet
                     ${PIP} install --cache-dir ${PIP_CACHE_DIR} -r requirements.txt --quiet
@@ -65,7 +65,7 @@ pipeline {
 
         stage('Quality Check') {
             steps {
-                sh """#!/bin/bash
+                sh """#!/bin/bash -e
                     ${PIP} install --cache-dir ${PIP_CACHE_DIR} flake8 --quiet
                     # || true ensures we don't fail the build on style warnings for now
                     ${VENV_DIR}/bin/flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics || true
@@ -75,7 +75,7 @@ pipeline {
         
         stage('Unit Tests') {
             steps {
-                sh """#!/bin/bash
+                sh """#!/bin/bash -e
                     ${PY} -m pytest tests/ -v --tb=short
                 """
             }
@@ -89,7 +89,7 @@ pipeline {
                 }
             }
             steps {
-                sh """#!/bin/bash
+                sh """#!/bin/bash -e
                     source scripts/gcp_config.sh
                     echo "🚀 Deploying Image to Artifact Registry..."
                     ./scripts/deploy_${ENV_SUFFIX}.sh
@@ -108,7 +108,7 @@ pipeline {
                 }
             }
             steps {
-                sh """#!/bin/bash
+                sh """#!/bin/bash -e
                     source scripts/gcp_config.sh
                     echo "🧪 Triggering Cloud Run Job to verify integration..."
                     ./scripts/run_cloud_job_${ENV_SUFFIX}.sh

@@ -74,7 +74,8 @@ for ROLE in \
   roles/artifactregistry.writer \
   roles/run.developer \
   roles/logging.viewer \
-  roles/serviceusage.serviceUsageConsumer; do
+  roles/serviceusage.serviceUsageConsumer \
+  roles/storage.bucketViewer; do
   gcloud projects add-iam-policy-binding $PROJECT_ID \
     --member="serviceAccount:$SA_EMAIL" --role="$ROLE" --condition=None
 done
@@ -82,6 +83,8 @@ done
 # 3. Allow uploading the build source to the Cloud Build bucket
 gcloud storage buckets add-iam-policy-binding gs://$BUCKET \
   --member="serviceAccount:$SA_EMAIL" --role=roles/storage.objectAdmin
+gcloud storage buckets add-iam-policy-binding gs://$BUCKET \
+  --member="serviceAccount:$SA_EMAIL" --role=roles/storage.legacyBucketReader
 
 # 4. Allow Jenkins to deploy Cloud Run Jobs that run as the runtime account
 gcloud iam service-accounts add-iam-policy-binding $RUNTIME_SA \
@@ -102,7 +105,8 @@ Why each role is needed:
 | `run.developer` | creating, updating and executing Cloud Run Jobs |
 | `logging.viewer` | `gcloud logging read` in `run_cloud_job_*.sh` |
 | `serviceusage.serviceUsageConsumer` | calling GCP APIs on the project |
-| `storage.objectAdmin` on the bucket | uploading the source tarball for Cloud Build |
+| `storage.bucketViewer` | `gcloud builds submit` lists the project's buckets to find its default `<project>_cloudbuild` bucket. Without it: *"The user is forbidden from accessing the bucket"* |
+| `storage.objectAdmin` + `storage.legacyBucketReader` on the bucket | uploading the source tarball for Cloud Build |
 | `iam.serviceAccountUser` on the runtime account | `--service-account` in `create_cloud_run_job_*.sh` |
 
 If a stage fails with `PERMISSION_DENIED`, the error names the missing permission. Add the matching role.

@@ -53,10 +53,13 @@ echo "🚀 Step 4: Building and pushing image..."
 echo "   ⏳ This may take several minutes..."
 echo ""
 
+# --suppress-logs: streaming logs needs project Viewer; without it gcloud
+# errors out immediately instead of waiting for the build to finish.
 gcloud builds submit \
   --tag "${DEV_IMAGE_URI}" \
   --project "${PROJECT_ID}" \
-  --timeout=20m
+  --timeout=20m \
+  --suppress-logs
 
 echo ""
 echo "=================================================="
