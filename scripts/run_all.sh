@@ -47,7 +47,25 @@ trap 'echo "[ERROR $(ts)] Failed at line $LINENO"; exit 1' ERR
 
 log "▶️ Running all processes for season=$SEASON, date=$DATE (season_type=$SEASON_TYPE, save_mode=$SAVE_MODE)"
 
-# ── 1. Post-game evaluation (always runs first, independent of today's games) ─
+# ── 1. Schedule refresh ───────────────────────────────────────────────────────
+# The schedule must be refreshed BEFORE the games gate: otherwise a stale schedule
+# (e.g. last season's at a season rollover) reports "no games" forever and the
+# pipeline never reaches get_nba_schedule to fix it. It also tells the boxscore
+# collector which of yesterday's games have ended.
+log "➡️ Running get_nba_schedule..."
+python main.py -p get_nba_schedule -s "$SEASON" -sm "$SAVE_MODE"
+log "✅ Finished get_nba_schedule"
+
+# ── 2. Yesterday's actuals + post-game evaluation (independent of today's games) ─
+# Boxscores of yesterday's games are only collected by *this* run (the previous run
+# started before those games were played), so they must be fetched BEFORE
+# post_evaluation — otherwise it finds 0 actuals and silently skips (no metrics,
+# no Discord alert). Runs before the games gate so it also happens on no-games days;
+# the collector only fetches ended games it does not have yet.
+log "➡️ Running get_nba_boxscore_basic (actuals for post_evaluation)..."
+python main.py -p get_nba_boxscore_basic -s "$SEASON" -st "$SEASON_TYPE" -sm "$SAVE_MODE"
+log "✅ Finished get_nba_boxscore_basic"
+
 log "➡️ Running post_evaluation for eval_date=$EVAL_DATE..."
 POST_EVALUATION_ARGS=(-p post_evaluation -sm "$SAVE_MODE" -d "$EVAL_DATE")
 if [ -n "${DISCORD_WEBHOOK_URL:-}" ]; then
@@ -56,14 +74,7 @@ fi
 python main.py "${POST_EVALUATION_ARGS[@]}"
 log "✅ Finished post_evaluation"
 
-# ── 2. Schedule refresh + games gate ──────────────────────────────────────────
-# The schedule must be refreshed BEFORE the gate: otherwise a stale schedule
-# (e.g. last season's at a season rollover) reports "no games" forever and the
-# pipeline never reaches get_nba_schedule to fix it.
-log "➡️ Running get_nba_schedule..."
-python main.py -p get_nba_schedule -s "$SEASON" -sm "$SAVE_MODE"
-log "✅ Finished get_nba_schedule"
-
+# ── 3. Games gate ─────────────────────────────────────────────────────────────
 # Exit code 2 = no games for DATE → nothing to collect, train, or predict.
 log "➡️ Checking if games are scheduled for $DATE..."
 set +e
@@ -82,7 +93,7 @@ fi
 log "✅ Games found for $DATE — running full pipeline."
 # ─────────────────────────────────────────────────────────────────────────────
 
-# ── 3. Full pipeline ──────────────────────────────────────────────────────────
+# ── 4. Full pipeline ──────────────────────────────────────────────────────────
 
 # ── Proxy pre-flight (always runs; prints diagnostics, never blocks) ────────
 if [ -n "${NBA_PROXY_USER:-}" ] && [ -n "${NBA_PROXY_PASS:-}" ]; then
@@ -100,10 +111,6 @@ log "✅ Finished get_nba_players"
 log "➡️ Running get_nba_teams..."
 python main.py -p get_nba_teams -sm "$SAVE_MODE"
 log "✅ Finished get_nba_teams"
-
-log "➡️ Running get_nba_boxscore_basic..."
-python main.py -p get_nba_boxscore_basic -s "$SEASON" -st "$SEASON_TYPE" -sm "$SAVE_MODE"
-log "✅ Finished get_nba_boxscore_basic"
 
 log "➡️ Running get_nba_advanced_boxscore..."
 python main.py -p get_nba_advanced_boxscore -s "$SEASON" -st "$SEASON_TYPE" -sm "$SAVE_MODE"
