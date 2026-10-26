@@ -30,6 +30,8 @@ ActualScoresFileName: str = "nba_actual_scores"
 # Post-game evaluation output tables
 EvaluationFileName: str = "nba_model_evaluation"
 EvaluationDetailFileName: str = "nba_model_evaluation_detail"
+# One-shot table: career-high TTFL score per player in past seasons
+HistoricTtflMaxFileName: str = "nba_historic_ttfl_max"
 
 # Define the path to the databases folder.
 databases_path: str = "databases/"

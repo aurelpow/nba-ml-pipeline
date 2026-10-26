@@ -18,6 +18,9 @@ This directory contains all deployment and job management scripts for Google Clo
 - **[update_cloud_job_develop.sh](#update_cloud_job_developsh)** - Update dev job
 - **[delete_cloud_job_develop.sh](#delete_cloud_job_developsh)** - Delete dev job
 
+### One-shot Jobs
+- **[run_historic_ttfl_max_once.sh](run_historic_ttfl_max_once.sh)** - Build `nba_historic_ttfl_max` once (creates, runs, then deletes its own Cloud Run Job; needs the develop image to contain the code)
+
 ### Production Jobs
 - **[create_cloud_run_job_production.sh](#create_cloud_run_job_productionsh)** - Create prod job
 - **[run_cloud_job_production.sh](#run_cloud_job_productionsh)** - Execute prod job

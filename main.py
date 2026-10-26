@@ -25,6 +25,7 @@ from src.data_collectors.get_nba_schedule import ScheduleData
 from src.data_collectors.get_nba_advanced_boxscore import AdvancedBoxscoreGames
 from src.data_collectors.get_injury_report import InjuryReportCollector
 from src.data_collectors.check_games_scheduled import GamesScheduleChecker
+from src.data_collectors.get_historic_ttfl_max import HistoricTtflMaxCollector
 from src.availability.availability_table import AvailabilityTableBuilder
 from src.predictors.unified_predictor import UnifiedPredictor
 from src.training.train import UnifiedModelTrainer
@@ -59,6 +60,7 @@ def main():
         "check_games_scheduled",
         "get_injury_report",
         "compute_availability",
+        "get_historic_ttfl_max",
         "train",
         "get_predictions_stats_points",
         "get_predictions_fantasy_points",
@@ -139,6 +141,18 @@ def main():
         AvailabilityTableBuilder(
             save_mode=save_mode,
             report_date=date,
+        ).run()
+
+    elif process_name == "get_historic_ttfl_max":
+        if not current_season:
+            logging.error("get_historic_ttfl_max requires -s <YYYY-YY>")
+            sys.exit(1)
+        print(f"Running process: {process_name} up to (excluding) season: {current_season}")
+        HistoricTtflMaxCollector(
+            current_season=current_season,
+            save_mode=save_mode,
+            proxy_user=os.getenv("NBA_PROXY_USER"),
+            proxy_pass=os.getenv("NBA_PROXY_PASS"),
         ).run()
 
     elif process_name == "train":

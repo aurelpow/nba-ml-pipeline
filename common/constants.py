@@ -9,6 +9,9 @@ max_retries: int = 3
 # Delay between retries in seconds
 retry_delay: int = 10
 
+# Season types aggregated by the one-shot historic TTFL max collector
+HISTORIC_TTFL_SEASON_TYPES: list[str] = ["Regular Season", "Playoffs"]
+
 # key statistics for points ML models
 key_stats_points: dict[str, str] = {
     "usagePercentage": "raw stats",
