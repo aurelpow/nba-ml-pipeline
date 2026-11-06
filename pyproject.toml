@@ -3,7 +3,7 @@ name = "nba-ml-pipeline"
 version = "0.6.4"
 description = "End-to-end ML pipeline that ingests NBA data, trains LightGBM models, predicts player stats (points + TTFL fantasy points), and monitors prediction quality."
 authors = [
-    { name = "Aurelien Pow" },
+    { name = "aurelpow" },
 ]
 readme = "README.md"
 requires-python = ">=3.11,<3.13"

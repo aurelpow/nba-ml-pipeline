@@ -1,0 +1,8 @@
+version = 1
+revision = 3
+requires-python = ">=3.11, <3.13"
+
+[[package]]
+name = "nba-ml-pipeline"
+version = "0.6.2"
+source = { virtual = "." }
