@@ -39,6 +39,7 @@ from common.feature_engineering import (
     get_volatility,
     get_final_df,
     get_rest_days,
+    count_games_played,
 )
 
 logger = logging.getLogger(__name__)
@@ -240,13 +241,8 @@ class UnifiedPredictor(metaclass=SingletonMeta):
         box = box[pd.to_datetime(box["game_date"]).dt.date < self.date]
         adv = adv[pd.to_datetime(adv["game_date"]).dt.date < self.date]
 
-        # Count distinct games played per player (before any filtering)
-        games_played_df = (
-            box.groupby("personId")["gameId"]
-            .nunique()
-            .reset_index()
-            .rename(columns={"gameId": "games_played"})
-        )
+        # Count distinct games each player actually played (minutes > 0)
+        games_played_df = count_games_played(box)
 
         # Merge & Preprocess Historical
         df_hist = merge_data(box, adv, data_map[PlayersFileName])
