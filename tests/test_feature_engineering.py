@@ -9,6 +9,8 @@ from common.feature_engineering import (
     compute_rolling_stats,
     encode_categorical_features,
     get_feature_cols,
+    get_volatility,
+    count_games_played,
 )
 
 
@@ -59,6 +61,42 @@ class TestFeatureEngineering(unittest.TestCase):
         self.assertIn("season", df.columns)
         self.assertIn("is_home", df.columns)
         self.assertIn("opponent", df.columns)
+
+    def test_missed_games(self):
+        # BigQuery stores missed games as empty strings, local CSV as NaN;
+        # both must be parsed to 0.0 minutes
+        for missed in ["", np.nan]:
+            box = self.box.assign(minutes=["30:00", missed, "0:00"])
+            df = preprocess_data(merge_data(box, self.adv, self.players))
+            self.assertTrue(pd.api.types.is_float_dtype(df["minutes"]))
+            self.assertEqual(df["minutes"].tolist(), [30.0, 0.0, 0.0])
+
+        # Volatility only sees played games, not a 0 for the missed one
+        df = pd.DataFrame(
+            {
+                "personId": ["p1"] * 6,
+                "game_date": pd.date_range("2023-01-01", periods=6),
+                "minutes": ["30:00", "32:00", "", "28:00", "35:00", "30:00"],
+                "fantasy_points": [50, 60, 0, 70, 80, 90],
+            }
+        )
+        volatility = get_volatility(preprocess_data(df), "fantasy_points")
+        expected = pd.Series([50, 60, 70, 80, 90]).std()
+        self.assertAlmostEqual(volatility["fantasy_volatility"].iloc[0], expected)
+
+        # Games played skips "" and "0:00"; p3 never played, so has no row
+        box = pd.DataFrame(
+            {
+                "gameId": ["g1", "g2", "g3", "g4", "g1", "g1"],
+                "personId": ["p1", "p1", "p1", "p1", "p2", "p3"],
+                "minutes": ["30:00", "28:00", "", "0:00", "25:00", ""],
+            }
+        )
+        games_played = count_games_played(box)
+        self.assertEqual(
+            dict(zip(games_played["personId"], games_played["games_played"])),
+            {"p1": 2, "p2": 1},
+        )
 
     def test_create_historical_features(self):
         df = merge_data(self.box, self.adv, self.players)

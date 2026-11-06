@@ -59,7 +59,7 @@ def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
         pd.DataFrame: Preprocessed DataFrame.
     """
     # Transform minutes from string to float
-    if "minutes" in df.columns and pd.api.types.is_string_dtype(df["minutes"]):
+    if "minutes" in df.columns:
         df["minutes"] = df["minutes"].apply(parse_minutes)
 
     # fill NaN values in 'position' with 'BENCH'
@@ -404,6 +404,23 @@ def get_rest_days(
     return rest_days_df[["personId", "rest_days"]]  # type: ignore
 
 
+def count_games_played(box: pd.DataFrame) -> pd.DataFrame:
+    """
+    Count distinct games each player actually played (minutes > 0).
+    Args:
+        box (pd.DataFrame): raw boxscore with minutes as "MM:SS" strings
+    Returns:
+        pd.DataFrame: DataFrame with personId and games_played columns
+    """
+    played: pd.DataFrame = box[box["minutes"].apply(parse_minutes) > 0]
+    return (
+        played.groupby("personId")["gameId"]
+        .nunique()
+        .reset_index()
+        .rename(columns={"gameId": "games_played"})
+    )
+
+
 def get_volatility(df_historical: pd.DataFrame, target_variable: str) -> pd.DataFrame:
     """
     Calculate fantasy points volatility (std dev over last 20 games).
@@ -416,7 +433,9 @@ def get_volatility(df_historical: pd.DataFrame, target_variable: str) -> pd.Data
 
     # Calculate volatility (std dev of fantasy points over last 10 games)
     # We need to do this on the full history before taking the tail
-    df_hist_sorted: pd.DataFrame = df_historical.sort_values(["personId", "game_date"])
+    # Missed games (minutes == 0) are not real scores, so they are left out
+    df_played: pd.DataFrame = df_historical[df_historical["minutes"] > 0]
+    df_hist_sorted: pd.DataFrame = df_played.sort_values(["personId", "game_date"])
     df_hist_sorted["fantasy_volatility"] = df_hist_sorted.groupby("personId")[
         target_variable
     ].transform(lambda x: x.rolling(20, min_periods=5).std())
