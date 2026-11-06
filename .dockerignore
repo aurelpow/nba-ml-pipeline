@@ -3,6 +3,9 @@
 __pycache__/
 *.py[cod]
 .venv/
+.uv-bootstrap/
+.uv-cache/
+.pip-cache/
 .vscode/
 .git/
 databases/

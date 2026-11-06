@@ -1,7 +1,11 @@
 FROM python:3.11-slim
 
+# PATH: uv installs into /app/.venv. Cloud Run jobs that override the command
+# with a bare `python` rely on it resolving to that venv.
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    UV_PYTHON_DOWNLOADS=never \
+    PATH="/app/.venv/bin:$PATH"
 
 WORKDIR /app
 
@@ -14,9 +18,9 @@ RUN apt-get update \
 RUN mkdir -p /app/databases
 
 # Install deps first for better caching
-COPY requirements.txt .
-RUN pip install --upgrade pip \
- && pip install --no-cache-dir -r requirements.txt
+COPY pyproject.toml uv.lock .python-version ./
+RUN pip install --no-cache-dir uv==0.11.32 \
+ && uv sync --locked --no-dev --no-install-project --no-cache
 
 # Copy code
 COPY main.py ./ 

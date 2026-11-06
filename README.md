@@ -164,7 +164,8 @@ python main.py --process get_predictions_fantasy_points \
 NBA_project_ML/
 ├── Dockerfile
 ├── run_all.sh            # Orchestrates all processes via env-vars
-├── requirements.txt      # Core Python dependencies
+├── pyproject.toml        # Python dependencies (managed with uv)
+├── uv.lock               # Pinned dependency versions
 ├── main.py               # CLI entrypoint for individual subprocesses
 ├── scripts/              # Deployment and setup scripts
 │   ├── deploy_develop.sh
@@ -244,10 +245,11 @@ NBA_project_ML/
 3. **(Optional) Local Python environment**
 
    ```bash
-   python3 -m venv .venv
+   uv sync
    source .venv/bin/activate
-   pip install -r requirements.txt
    ```
+
+   Requires [uv](https://docs.astral.sh/uv/). Add dependencies with `uv add <package>`, which updates `pyproject.toml` and `uv.lock`; commit both.
 
 ---
 

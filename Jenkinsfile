@@ -21,10 +21,13 @@ pipeline {
         // 3. CREDENTIAL IDs (Must match Jenkins UI)
         GCP_CREDS_ID = 'gcp-service-account-key' 
         GCP_CONFIG_ID = 'gcp-config-sh'
-        PIP_CACHE_DIR = "${WORKSPACE}/.pip-cache"
+        // uv is bootstrapped per workspace, so the Jenkins image needs no rebuild.
+        // Keep UV_VERSION in sync with the Dockerfile.
+        UV_VERSION    = '0.11.32'
+        UV_CACHE_DIR  = "${WORKSPACE}/.uv-cache"
+        UV_BOOTSTRAP  = "${WORKSPACE}/.uv-bootstrap"
         VENV_DIR      = "${WORKSPACE}/.venv"
         PY            = "${WORKSPACE}/.venv/bin/python3"
-        PIP           = "${WORKSPACE}/.venv/bin/pip"
     }
 
     stages {
@@ -56,9 +59,9 @@ pipeline {
         stage('Setup Python') {
             steps {
                 sh """#!/bin/bash -e
-                    python3 -m venv ${VENV_DIR}
-                    ${PIP} install --upgrade pip --quiet
-                    ${PIP} install --cache-dir ${PIP_CACHE_DIR} -r requirements.txt --quiet
+                    python3 -m venv ${UV_BOOTSTRAP}
+                    ${UV_BOOTSTRAP}/bin/pip install uv==${UV_VERSION} --quiet
+                    ${UV_BOOTSTRAP}/bin/uv sync --locked
                 """
             }
         }
@@ -66,7 +69,6 @@ pipeline {
         stage('Quality Check') {
             steps {
                 sh """#!/bin/bash -e
-                    ${PIP} install --cache-dir ${PIP_CACHE_DIR} flake8 --quiet
                     # || true ensures we don't fail the build on style warnings for now
                     ${VENV_DIR}/bin/flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics || true
                 """

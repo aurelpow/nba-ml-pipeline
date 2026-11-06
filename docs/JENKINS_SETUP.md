@@ -9,7 +9,7 @@ The root [Jenkinsfile](../Jenkinsfile) runs these stages:
 | Stage | What it does |
 |---|---|
 | Initialize & Auth | Copies the `gcp-config-sh` credential to `scripts/gcp_config.sh`, then logs in to GCP with the `gcp-service-account-key` credential |
-| Setup Python | Creates a venv and installs `requirements.txt` |
+| Setup Python | Bootstraps uv, then runs `uv sync --locked` to install from `uv.lock` (fails if the lockfile is out of date) |
 | Quality Check | `flake8` (non-blocking) |
 | Unit Tests | `pytest tests/` |
 | Deploy & Create Job | `scripts/deploy_<env>.sh` (Cloud Build to Artifact Registry), then `scripts/create_cloud_run_job_<env>.sh` |
